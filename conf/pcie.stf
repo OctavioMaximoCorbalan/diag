@@ -1,0 +1,83 @@
+#BLK=PCIE_PHY_test_Gen3_prepare
+#CMD=$tool -rcgen3strap=1
+#CMD=$tool -pcielinkspeed=3 -forceRCmaxtargetlinkspeed
+
+#BLK=PCIE_PHY_test_Gen4_prepare
+#CMD=$tool -rcgen4strap=1
+#CMD=$tool -pcielinkspeed=4 -forceRCmaxtargetlinkspeed
+
+#BLK=PCIE_Link_Width_Speed_Test
+AJ015.001
+AJ015.002
+AJ015.003
+AJ015.004
+AJ015.005
+AJ015.006
+//AJ018.001  
+//AJ018.002   
+//AJ018.003  
+//AJ018.004   
+//AJ018.007  
+//AJ018.008  
+//AJ018.009  
+//AJ018.012  
+//AJ018.013  
+//AJ018.016  
+AJ020.001
+AJ020.005
+AJ020.008
+
+#BLK=PCIE_Link_Width_Speed_Test_Gen4
+AJ015.001
+AJ015.002
+AJ015.003
+AJ015.004
+AJ015.005
+AJ015.006
+AJ015.007
+AJ015.008
+AJ015.009
+AJ015.010
+//AJ018.001
+//AJ018.002
+//AJ018.003
+//AJ018.004
+//AJ018.007
+//AJ018.008
+//AJ018.009
+//AJ018.012
+//AJ018.013
+//AJ018.016
+AJ020.001
+AJ020.005
+AJ020.008
+AJ020.015
+AJ020.017
+AJ020.019
+
+#BLK=PCIE_Link_Quality_Test
+AG020.003
+AG020.005
+SDMA200.3
+AG020.004
+AG020.006
+AG020.008 #PAR=-linkwidth=8
+AG020.010 #PAR=-linkspeed=3 
+
+#BLK=PCIE_Link_Quality_Test_Gen4
+AG020.003
+AG020.005
+SDMA200.3
+AG020.004
+AG020.006
+AG020.008 #PAR=-linkwidth=8
+AG020.010 #PAR=-linkspeed=4
+
+#BLK=PCIE_Link_Width_X4_Test
+AJ18.3
+
+
+#BLK=PCIE_Link_Width_X8_Test
+AJ18.3
+AJ18.4
+AJ18.13

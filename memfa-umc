@@ -1,0 +1,2 @@
+./agt -ppmode=1
+sudo ./tserver -cf=tserver.cf -d=1 -blk=memfa-umc

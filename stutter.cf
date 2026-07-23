@@ -1,0 +1,15 @@
+-d=1
+-eofe=1
+-log
+-pr
+-fskip
+-df_ecc_config_mode=gncm_noalloc
+-mc_umc_stutter=umc_perf
+-mc_umc_stutter_threshold=0.025
+-mcfill_execute_reverse_sequential_fill=0
+-mcfill_execute_reverse_sequential_read=0
+-mcfill_write_read_delay_ms=4000
+-mc_disable_dcn_force_allow_self_refresh
+//-df_force_init_smu_cstate_enable
+-mc_force_df_cstate
+-df_force_deinit_smu_cstate_disable

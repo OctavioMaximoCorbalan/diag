@@ -1,0 +1,5 @@
+#BLK=INIT,PAR="-df_ecc_config_restore_disable -df_ecc_mca_enable=1 -ta_reg_unroll=1"
+ini1.1
+
+#BLK=INIT_1,PAR="-df_force_smu_cstate_disable"
+ini1.1

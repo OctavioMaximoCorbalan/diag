@@ -1,0 +1,12 @@
+  ======= Memory Functions List =======
+
+memtune fbcheck: Check frame buffer to detect DQ failure
+memtune mc: Display memory related settings
+memtune marginscript : Generate scripts to run the training mode margin test
+memtune marginscript_strobe : Generate scripts to run the strobe mode margin test
+memtune margintest -testfile=<test filename>: Run GDDR6 Margin test
+memtune margintest_strobe -testfile=<test filename>: Run GDDR6 strobe mode margin test
+memtune trainingcheck: Check for memory training failures during boot
+memtune: Show version and list all present AMD graphics devices
+memtune -i: Displays a list of all present AMD graphics devices
+memtune -i=<#>: Choose instance of the target device from the device list

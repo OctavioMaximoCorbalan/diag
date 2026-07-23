@@ -1,0 +1,9 @@
+-d=1
+-chkedc=all
+-edcthresh=50
+-eofe=1
+-checkras=df_ecc
+-log
+-pr
+-fskip
+-skiptextbuffering

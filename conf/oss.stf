@@ -1,0 +1,16 @@
+#BLK=OSS_SDMA_Linear
+nsdma1.1-2
+
+#BLK=OSS_SDMA
+nsdma46.1-2
+sdma74.1-2
+nsdma60.1-2
+hdp3.1
+hdp4.1
+hdp11.1
+hdp12.1
+sdma200.1
+sdma200.3
+sdma200.5
+sdma200.7
+

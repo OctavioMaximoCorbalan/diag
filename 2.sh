@@ -1,0 +1,1 @@
+./tserver -boardtest=chkfp -rmdriver

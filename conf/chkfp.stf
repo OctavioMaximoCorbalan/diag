@@ -1,0 +1,5 @@
+#BLK=Check_FP_LOOP, PAR="-maxframes=2000 -surfacecrcmode=shader -maxtime=300 -tglEnableMCBP -texture_shader_tile_copy -monitor_perf -monitorperf_select=none -pm_sys_mem -monitorperf_limit_select=app_sku_oc -crcmode=none -s3d_render_loop=100"
+std5.9
+
+#BLK=Check_FP, PAR="-maxframes=2000 -surfacecrcmode=shader -maxtime=0 -s3d_render_loop=3 -fiwc -monitor_perf -pm_sys_mem -monitorperf_limit_select=app_sku_oc -monitorperf_select=perf"
+std5.9

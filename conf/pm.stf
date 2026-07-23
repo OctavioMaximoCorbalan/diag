@@ -1,0 +1,40 @@
+#BLK=VCN_POWER_UP
+PM80.804
+
+#BLK=VCN_POWER_DOWN
+PM80.805
+
+#BLK=FAN_CTRL_DISABLE
+PM14.13 #PAR="-pm_mission_mode_check=false"
+
+#BLK=FAN_CTRL_ENABLE
+PM14.12
+
+#BLK=GPU_CTF, PAR="-ta_reg_unroll=1 -skiptextbuffering"
+PM013.008
+
+//Ext Mfg
+#BLK=FAN, PAR="-pm_extended_check"
+PM014.001 #PAR="-pm_fan_50_delay=3000"
+
+//Ext Mfg
+#BLK=ZERO_RPM, PAR="-pm_ignore_vbios -zerorpm_offset_start=30"
+PM014.11 #PAR="-zerorpm_minpwm=20"
+
+#BLK=AUTO_DPM_TOG, PAR="-autodpmtog=sclk,socclk,mclk,1,0"
+PM080.012 #PAR="-pm_null_delay=10000"
+
+#BLK=AUTO_DPM_TOG_GFX_UMC, PAR="-autodpmtog=sclk,socclk,mclk,1,0"
+STD004.033 #PAR="-maxframes=2000 -maxtime=0 -texture_shader_tile_copy"
+UMC321.022 #PAR="-df_ecc_config_mode=gncm_noalloc"
+UMC376.013 #PAR="-df_ecc_config_mode=gncm_noalloc"
+
+#BLK=GFXOFF_SANITY,MASK,PAR="-bEnableIslandPowerGating=1 -tc_EnableAsyncGfxRing=1 -tl_cg -gfxoff -tglReadRegisterByPacket=1 -tc_MapAsyncGfxQueuesWithKIQ=1"
+PM080.012 #PAR="-pm_null_delay=1000"
+
+///< Block Definitino: BACO
+#BLK=BACO
+PM031.005 #PAR="-nogc -display_d3_save_restore -pm_baco_exit_gfxoff -pm_ignore_baco_monitor -pm_ignore_vbios"
+
+#BLK=BAMACO
+PM031.006 #PAR="-nogc -display_d3_save_restore -pm_baco_exit_gfxoff -pm_ignore_baco_monitor -pm_ignore_vbios -pm_verify_fb_method=0 -pm_sr_level=1""

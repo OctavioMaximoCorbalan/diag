@@ -1,0 +1,14 @@
+-d=1
+-eofe=1
+-log
+-pr
+-fskip
+-v=error
+-df_ecc_config_mode=gncm_noalloc
+-mc_event_umcch_pg_test
+-mc_event_umcch_pg_threshold=0.025
+-mcfill_write_read_delay_ms=1000
+-mc_disable_dcn_force_allow_self_refresh
+//-df_force_init_smu_cstate_enable
+-mc_force_df_cstate
+-df_force_deinit_smu_cstate_disable

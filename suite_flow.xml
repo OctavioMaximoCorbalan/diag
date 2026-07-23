@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<suite_flow Version="1.0">
+    <test_sequence name="quickmfg" supported_sku="XT,XL,XM,XMW" />
+    <test_sequence name="quickmfg4" supported_sku="XT,XL,XM,XMW" />
+    <test_sequence name="qualmfg4" supported_sku="XT,XL" />
+    <test_sequence name="chkfp" supported_sku="XT" />
+    <test_sequence name="extmfg" supported_sku="XT,XL,XM,XMW" />
+    <test_sequence name="config" supported_sku="XT,XL,XM,XMW" />
+    <test_sequence name="memfa" supported_sku="XT,XL,XM,XMW" />
+    <test_sequence name="dpm" supported_sku="XT,XL,XM,XMW" />
+</suite_flow>

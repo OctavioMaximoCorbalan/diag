@@ -1,0 +1,25 @@
+#BLK=VCN_A_UDEC_Performance_Core_bitstream_tests, PAR="-vcn_instance_id=0"
+// H265 Decoding Tests
+VCN105.304
+
+// VP9 Bitstream Tests
+VCN106.117
+
+// AV1 Bitstream Tests
+VCN107.017
+VCN107.117
+
+#BLK=VCN_A_MJPEG_bitstream_tests, PAR="-vcn_instance_id=0 -vcnMjpegHwCrc=0"
+// MJPEG YUV420 NV12 encoding
+VCN250.007
+
+// MJPEG parallel decode and encode
+VCN280.001
+
+#BLK=VCN_A_ENCODE_tests, PAR="-vcn_instance_id=0"
+// H265 encode
+VCN350.113
+
+#BLK=VCN_A_MULTI_JOB_tests, PAR="-vcn_instance_id=0"
+// AV1 1920x1080 decode + AVC Encode 4K + HEVC Encode 8K
+VCN530.008

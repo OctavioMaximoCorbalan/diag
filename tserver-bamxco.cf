@@ -1,0 +1,7 @@
+-d=1
+-display_d3_save_restore
+-eofe=1
+-pr
+-fskip
+-log
+-skiptextbuffering

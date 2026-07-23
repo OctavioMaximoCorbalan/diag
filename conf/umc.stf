@@ -1,0 +1,64 @@
+#BLK=Memory, PAR="-df_ecc_config_mode=gncm_noalloc "
+UMC1.3 #NOZFB
+UMC303.7
+
+#BLK=UMC_LFB, PAR="-df_ecc_config_mode=gncm_noalloc -pm4rb=system -pm4ib=system -pm4rbsize=0x20000 "
+UMC321.025
+UMC383.016
+UMC404.014
+UMC56.155  #NOZFB
+UMC56.154  #NOZFB
+
+#BLK=UMC_STD, PAR="-df_ecc_config_mode=gncm_noalloc -maxframes=2000 -surfacecrcmode=shader -maxtime=0 -texture_shader_tile_copy -tglEnableSCBinning=0 -tglDisableBinningUseLegacySC=1 "
+std4.6
+std4.33 #PAR="-fiwc"
+
+#BLK=Memfa-Basic,PAR="-pr -log -df_ecc_config_mode=gncm_noalloc "
+UMC413.001 #PAR=-memfa_mem=1 -short_test=1
+UMC600.001 #PAR=-memfa_mem=1
+
+#BLK=Memfa-RandomBlt,PAR="-pr -log -df_ecc_config_mode=gncm_noalloc "
+UMC601.001
+
+#BLK=Memfa-UMC, PAR="-memfa_mem=1 -mcdebug -log -nlog=10240 -pr -df_ecc_config_mode=gncm_noalloc "
+umc1.2
+umc1.3
+umc1.4
+umc3.3
+umc5.3
+umc6.3
+umc7.3
+umc8.3
+umc9.3
+umc10.3
+umc11.3
+umc12.3
+umc13.3
+umc369.6
+umc370.6
+umc371.6
+umc376.19,24
+umc382.26
+umc383.4-19
+umc56.153 #PAR=-pm4rb=system -pm4ib=system -pm4rbsize=0x20000
+umc56.154 #PAR=-pm4rb=system -pm4ib=system -pm4rbsize=0x20000
+umc56.155 #PAR=-pm4rb=system -pm4ib=system -pm4rbsize=0x20000
+umc56.156 #PAR=-pm4rb=system -pm4ib=system -pm4rbsize=0x20000
+umc56.157 #PAR=-pm4rb=system -pm4ib=system -pm4rbsize=0x20000
+umc56.158 #PAR=-pm4rb=system -pm4ib=system -pm4rbsize=0x20000
+umc56.159 #PAR=-pm4rb=system -pm4ib=system -pm4rbsize=0x20000
+umc405.1-5
+umc405.11-15
+
+#BLK=Memory-Stutter, PAR=-cf=stutter.cf, NOZFB
+UMC1.50
+
+#BLK=UMC_PG, PAR=-cf=umcpg.cf, NOZFB
+UMC49.1
+
+#BLK=Stress3D_Memfa2, PAR="-df_ecc_config_mode=gncm_noalloc  -surfacecrcmode=shader -tglEnableMCBP -texture_shader_tile_copy"
+std1.36 #PAR="-maxframes=740 -maxtime=0 -vm -tc_PageTableRegionSize=0x40000000"
+std2.6 #PAR="-maxframes=2000 -maxtime=0 -tglEnableSCBinning=0 -tglDisableBinningUseLegacySC=1"
+std3.6 #PAR="-maxframes=2000 -maxtime=0 -tglEnableSCBinning=0 -tglDisableBinningUseLegacySC=1"
+std5.9 #PAR="-maxframes=2000 -maxtime=0 "
+

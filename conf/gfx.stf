@@ -1,0 +1,18 @@
+#BLK=Stress3D_WITH_NATURE_DPM, PAR="-nature_dpm -power_tune_log_config=all -report_power_tune_error=1 -power_tune_sample_period=50 -texture_shader_tile_copy -vm -tc_PageTableRegionSize=0x80000000 -surfacecrcmode=shader -tglEnableMCBP"
+std1.36 #PAR="-maxframes=250 -maxtime=0"
+std2.6 #PAR="-tglEnableSCBinning=0 -tglDisableBinningUseLegacySC=1 -maxframes=2000 -maxtime=0"
+std3.6 #PAR="-tglEnableSCBinning=0 -tglDisableBinningUseLegacySC=1 -maxframes=2000 -maxtime=0"
+std4.33 #PAR="-fiwc -maxframes=2000 -maxtime=0"
+std5.9 #PAR="-constant_frame_delay=0.005 -fiwc -s3d_render_loop=2 -maxframes=2000 -maxtime=0"
+
+#BLK=PM4Player_WITH_NATURE_DPM, PAR="-cf=gpu/pm4play.cf -nature_dpm -power_tune_log_config=all -report_power_tune_error=1 -power_tune_sample_period=50"
+pk16.51 #PAR=-pm4file=gpu/pm4play/pk016051
+pk16.51 #PAR=-pm4file=gpu/pm4play/pk016051 -df_ecc_config_mode=gncm_noalloc
+pk18.51 #PAR=-pm4file=gpu/pm4play/pk018051
+
+#BLK=PM4Player, PAR="-cf=gpu/pm4play.cf"
+pk16.51 #PAR=-pm4file=gpu/pm4play/pk016051
+pk18.51 #PAR=-pm4file=gpu/pm4play/pk018051
+
+#BLK=STD_GFXOFF,PAR="-fiwc=1 -tc_DefaultCopyUtil=CpDma -bEnableIslandPowerGating=1 -tc_EnableAsyncGfxRing=1 -tl_cg -tglReadRegisterByPacket=1 -tc_MapAsyncGfxQueuesWithKIQ=1 -tglShadowEverything -gpu_copyengine=tcore -texture_shader_tile_copy -gfxoff -tglEnableMCBP"
+std2.6 #PAR=-tglEnableSCBinning=0 -tglDisableBinningUseLegacySC=1

@@ -1,0 +1,44 @@
+#Rev:4.01 Update
+#Change list:
+#1.keep errorid.tmp file
+#2.ECS PPID取消全数字检查
+#3.PPID 长度15位卡关
+#4.增加Memory size vendor检查
+#5.Config memory size匹配检查
+#5.保留log.txt
+
+#Rev:3.00 Update by Jane 2020-12
+#Change list: 
+#1.Improve LOG details
+#2.Delete digital judgement
+#3.Add 60-PN in CONF.DAT
+#4.Check PPID after flashed PPID
+
+
+#Rev:2.02 Update by Jane 2020-11-13
+#Change list: 
+#1.Put Add_APRP in the last
+#2.add subs : Dual(P/Q) BIOS check 
+#3.CFG file : add FANTEST version select
+
+#Rev:2.01 Update by Jane 2020-11-09
+#Change list: Integrate all the tests and Add LOG File
+
+#Rev:2.0 Update by Jet on 2020-11-04
+#changed for NAVI21
+
+#Rev:1.2 Update by BIOS Team 2019-10-28
+#ChangeList:
+#1.Remove OC test item
+
+#Rev:1.0 Update by BIOS Team 2019-09-24
+#ChangeList:
+#1.Add OC check 
+#2.Add MemTune 
+#3.Add DUAL BIOS P-Mode check
+
+#Rev:0.1 Written by Jane 2016-03-28
+
+
+
+

@@ -1,0 +1,6 @@
+./db32 cmd 'mmw_rmw 0x5d88 &ffffff0f|40'
+./db32 cmd 'mmw_rmw 0x5d8a &fffffeff|100'
+./db32 cmd 'mmw_rmw 0x5d89 &fffffeff'
+./db32 cmd regr32 0x1762c
+./db32 cmd 'mmw_rmw 0x16669 &ffffc7ff|800'
+./db32 cmd 'mmw_rmw 0x16667 &ffffff00|4B'

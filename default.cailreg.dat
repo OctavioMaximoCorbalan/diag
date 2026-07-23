@@ -1,0 +1,7 @@
+SMU_DisallowedFeatures=0x110000004
+SMU_DisallowedFeatures=0x10000000
+AsicSetupControl=0x1
+ClockGatingGfxCgcg=1       
+ClockGatingGfxCgls=1       
+ClockGatingGfx3dCgcg=1     
+ClockGatingGfx3dCgls=1    

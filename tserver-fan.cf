@@ -1,0 +1,4 @@
+-d=1
+-log
+-skiptextbuffering
+-v=info

@@ -1,0 +1,53 @@
+#BLK=BQ_Multi_WITH_NATURE_DPM, PAR="-maxtime=0 -tglEnableMCBP=1 -texture_shader_tile_copy=1 -vcn_use_psp_init=1 -vcnDpgEnable=1 -dal_use_dmcub=1 -nature_dpm -power_tune_log_config=all -report_power_tune_error=1 -power_tune_sample_period=50"
+MULT483.001
+MULT483.002 #PAR="-fiwc=1"
+MULT483.003
+MULT483.004 #PAR=-job_done_cntr=500000
+MULT483.005 #PAR="-fiwc=1" 
+MULT483.006
+MULT483.013 #PAR=-job_done_cntr=500000
+MULT483.014
+
+#BLK=BQ_Dummy
+// Helper block to force packaging to include media for VCN/TPUT tests in MULTI blocks
+VCN350.116
+VCN107.118
+TPUT100.2
+CAT002.001
+GCI30.110
+
+#BLK=BQ_Memory, PAR="-df_ecc_config_mode=gncm_noalloc"
+UMC56.154 #NOZFB #PAR="-pm4rb=system -pm4ib=system -pm4rbsize=0x20000"
+UMC56.155 #NOZFB #PAR="-pm4rb=system -pm4ib=system -pm4rbsize=0x20000"
+UMC56.156 #NOZFB #PAR="-pm4rb=system -pm4ib=system -pm4rbsize=0x20000"
+UMC56.159 #NOZFB #PAR="-pm4rb=system -pm4ib=system -pm4rbsize=0x20000"
+UMC1.820 #NOZFB #PAR="-pm4rb=system -pm4ib=system -pm4rbsize=0x20000"
+UMC1.820 #NOZFB #PAR="-pm4rb=system -pm4ib=system -pm4rbsize=0x20000 -mc_shader_inner_sleep_delay=2 -mc_shader_outer_sleep_loops=1 -nloop=8"
+UMC1.820 #NOZFB #PAR="-pm4rb=system -pm4ib=system -pm4rbsize=0x20000 -mc_shader_inner_sleep_delay=3 -mc_shader_outer_sleep_loops=1 -nloop=8"
+UMC1.820 #NOZFB #PAR="-pm4rb=system -pm4ib=system -pm4rbsize=0x20000 -mc_shader_inner_sleep_delay=4 -mc_shader_outer_sleep_loops=1 -nloop=8"
+UMC1.821 #NOZFB #PAR="-pm4rb=system -pm4ib=system -pm4rbsize=0x20000"
+UMC600.001 #NOZFB #PAR="-memfa_mem=1 -mcnumloops=100"
+UMC601.001 #NOZFB
+
+
+#BLK=BQ_Multi_SDMA, PAR="-oss_timeout=12000"
+NSDMA402.001
+#RESTART
+NSDMA402.001
+#RESTART
+NSDMA402.001
+#RESTART
+NSDMA402.001
+
+#BLK=BQ_Stress3D_1, PAR="-maxtime=0 -tglEnableMCBP=1 -texture_shader_tile_copy=1 -dal_use_dmcub=1 -s3d_render_loop=15 -fiwc"
+STD5.9
+
+#BLK=BQ_Stress3D_2, PAR="-fiwc=1 -maxtime=0 -tglEnableMCBP=1 -texture_shader_tile_copy=1 -dal_use_dmcub=1 -rsc=8"
+STD4.33
+
+#BLK=BQ_PKStress, PAR="-cf=gpu/pm4play.cf -d2=4096,2048,argb8888 -dc_stream2=4k60 -d3=4096,2048,argb8888 -dc_stream3=4k60 -d4=4096,2048,argb8888 -dc_stream4=4k60"
+pk16.51 #PAR="-pm4file=gpu/pm4play/pk016051 -crcmode=none -loop=250 -loopmode=draw"
+
+#BLK=BQ_MULTI_1, PAR="-gpu_copyengine=tcore -surfacecrcmode=shader -maxtime=0 -fiwc=1"
+//(Compute)GCI30.110 + (Graphics)STD4.33 + (SDMA)TPUT100.2 + (MM)VCN350.116
+MULT210.1 #PAR="-tput_rbloop=30 -maxframes=2000 -linpack_fma_divider=70 -multi_ip_vcn_loop=40 -multi_ip_vcn_post_trigger_delay=2000 -job_done_cntr=120000"

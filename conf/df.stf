@@ -1,0 +1,12 @@
+#BLK=DF_Atomics_test_0, PAR="-bit64op=0"
+DF104.0
+DF104.1
+
+#BLK=DF_Atomics_test_1, PAR="-bit64op=1"
+DF104.0
+DF104.1
+
+#BLK=DF_Coherency_test, PAR=""
+DF103
+
+

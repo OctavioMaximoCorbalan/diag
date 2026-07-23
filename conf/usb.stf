@@ -1,0 +1,34 @@
+#BLK=USB_DETECT,PAR="-d=9"
+SUS1.1          //Tests all the ports
+SUS1.2          //Tests usbport=1
+
+#BLK=USB_DETECT_3_0,PAR="-d=9 -speedofdevcon=3.0"
+SUS1.2        //Tests usbport=1
+
+#BLK=USB_DETECT_3_1,PAR="-d=9 -speedofdevcon=3.1"
+SUS1.2        //Tests usbport=1
+
+#BLK=USB_RW_SDA, PAR="-d=9"
+SUS8.19      //  /dev/sda
+
+#BLK=USB_DOWNGRADE
+SUS5.1 #PAR="-d=9 -usbport=1"
+
+#BLK=USB_UPGRADE
+SUS5.2 #PAR="-d=9 -usbport=1"
+
+#BLK=USB_SEQ
+// Detect 3.1
+SUS1.2 #PAR="-speedofdevcon=3.1"
+// RW
+SUS8.19
+// Detect 3.1
+SUS1.2 #PAR="-speedofdevcon=3.1"
+// Downgrade
+SUS5.1 #PAR="-usbport=1"
+// Detect 2.0
+SUS1.2 
+// Upgrade
+SUS5.2 #PAR="-usbport=1"
+// Detect 3.1
+SUS1.2 #PAR="-speedofdevcon=3.1"

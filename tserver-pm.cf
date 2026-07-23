@@ -1,0 +1,6 @@
+-d=1
+-pr
+-log
+-eofe=1
+-fskip
+-skiptextbuffering

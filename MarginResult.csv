@@ -1,0 +1,48 @@
+
+TOOL VERSION: 1.0.2.98
+
+VendorID: 0x1002 DeviceID: 0x73ef SSID: 0x6502 (0000:03:00.0) 
+Memory CLK : 96.99MHz - Training mode test
+Mon Sep 22 04:49:28 2025
+Test duration : 0 Hours 0 Minutes 23 Seconds
+
+*** READ Result ***
+Margin Point            , CH_A0, CH_A1, CH_B0, CH_B1, CH_C0, CH_C1, CH_D0, CH_D1
+Default (Trained Value) ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Phase Right (+1)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Phase Left  (-1)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Vref High   (+5)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Vref Low    (-5)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+
+*** WRITE Result ***
+Margin Point            , CH_A0, CH_A1, CH_B0, CH_B1, CH_C0, CH_C1, CH_D0, CH_D1
+Default (Trained Value) ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Phase Right (+1)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Phase Left  (-1)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Vref High   (+4)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Vref Low    (-4)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+
+
+TOOL VERSION: 1.0.2.98
+
+VendorID: 0x1002 DeviceID: 0x73ef SSID: 0x6502 (0000:03:00.0) 
+Memory CLK : 96.99MHz - Training mode test
+Mon Sep 22 04:51:42 2025
+Test duration : 0 Hours 0 Minutes 20 Seconds
+
+*** READ Result ***
+Margin Point            , CH_A0, CH_A1, CH_B0, CH_B1, CH_C0, CH_C1, CH_D0, CH_D1
+Default (Trained Value) ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Phase Right (+1)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Phase Left  (-1)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Vref High   (+5)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Vref Low    (-5)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+
+*** WRITE Result ***
+Margin Point            , CH_A0, CH_A1, CH_B0, CH_B1, CH_C0, CH_C1, CH_D0, CH_D1
+Default (Trained Value) ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Phase Right (+1)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Phase Left  (-1)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Vref High   (+4)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+Vref Low    (-4)        ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  ,  NA  
+
