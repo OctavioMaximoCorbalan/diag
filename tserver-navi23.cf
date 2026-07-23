@@ -1,0 +1,14 @@
+-d=1
+-pr
+-log
+-eofe=1
+-fskip
+-skiptextbuffering
+-checkras=df_ecc
+-chkedc=all
+-edcthresh=50
+-memtemplimit
+-monitor_perf
+-monitorperf_select=metrics
+-pm_sys_mem
+-v=info

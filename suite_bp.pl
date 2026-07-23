@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 use strict;
-use subs qw/quickmfg quickmfg4 qualmfg qualmfg4 extmfg config memfa memfa2 dpm ctf mfgfa init info/;
+use subs qw/quickmfg quickmfg4 qualmfg qualmfg4 extmfg config memfa memfa2 dpm ctf mfgfa init info NAVI23_MEMFA/;
 our %args;
 our $tsl_param;
 our %global;
@@ -22,7 +22,7 @@ $dgpu_rid=get_dgpu_revision();
 
 register_param_option(
   boardtest => [qw/
-    quickmfg quickmfg4 qualmfg qualmfg4 extmfg memfa memfa2 dpm config ctf mfgfa info init chkfp/],
+    quickmfg quickmfg4 qualmfg qualmfg4 extmfg memfa memfa2 dpm config ctf mfgfa info init chkfp NAVI23_MEMFA/],
 );
 
 # config: quickmfg dpm ctf pcie-linkwidth
@@ -340,6 +340,16 @@ sub memfa {
     clear_func_param;
     add_func_param("-cf=tserver.cf");
     add_block "Memfa-umc";
+}
+
+sub NAVI23_MEMFA {
+    info();
+    init_flow(1);
+    bump_clocks();
+    clear_func_param;
+    add_func_param("-cf=tserver-navi23.cf");
+    add_block "NAVI23_MEMFA";
+    restore_nature_dpm();
 }
 
 sub memfa2 {

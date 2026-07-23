@@ -1,3 +1,7 @@
+#BLK=NAVI23_MEMFA, PAR="-pr -log -df_ecc_config_mode=gncm_noalloc -memfa_mem=1"
+UMC413.001
+UMC600.001
+
 #BLK=Memory, PAR="-df_ecc_config_mode=gncm_noalloc "
 UMC1.3 #NOZFB
 UMC303.7
