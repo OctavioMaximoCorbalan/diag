@@ -2,12 +2,14 @@
 # Navi23 RX6650 XT 8GB / 128-bit topology: channels A0/A1/B0/B1 (UMC mask equivalent)
 UMC413.001
 UMC600.001
+UMC601.001
 
 #BLK=NAVI23_CHANNELS, PAR="-pr -log -df_ecc_config_mode=gncm_noalloc -memfa_mem=1 -short_test=0"
 UMC1.3 #NOZFB
 UMC303.7
 UMC321.025
 UMC383.016
+UMC382.026
 UMC404.014
 UMC56.155  #NOZFB
 UMC56.154  #NOZFB
@@ -33,6 +35,11 @@ UMC600.001 #PAR=-memfa_mem=1
 
 #BLK=Memfa-RandomBlt,PAR="-pr -log -df_ecc_config_mode=gncm_noalloc "
 UMC601.001
+
+#BLK=NAVI23_STRESS, PAR="-pr -log -df_ecc_config_mode=gncm_noalloc -memfa_mem=1"
+# Stress post-reparacion: saturacion MC + multi-engine para Navi23
+UMC404.014
+MULT483.001
 
 #BLK=Memfa-UMC, PAR="-memfa_mem=1 -mcdebug -log -nlog=10240 -pr -df_ecc_config_mode=gncm_noalloc "
 umc1.2

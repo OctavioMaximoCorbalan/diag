@@ -8,5 +8,6 @@
     <test_sequence name="config" supported_sku="XT,XL,XM,XMW" />
     <test_sequence name="memfa" supported_sku="XT,XL,XM,XMW" />
     <test_sequence name="NAVI23_MEMFA" supported_sku="XT,XL,XM,XMW" />
+    <test_sequence name="navi23_stress" supported_sku="XT,XL,XM,XMW" />
     <test_sequence name="dpm" supported_sku="XT,XL,XM,XMW" />
 </suite_flow>

@@ -19,35 +19,15 @@ my $profile_dst = 'FCT_CONF.DAT';
 # ===================================================================
 # PILAR 1: RUTINAS DE VALIDACIÓN DE HARDWARE (Rescatadas de Asus)
 # ===================================================================
-        # Avoid counting generic 'Request = N' as a read error. Capture
-        # request counts separately and only treat explicit error counters
-        # as failures.
-        my ($read_err) = $line =~ /\b(?:read|reads?)\b[^\d\n\p{P}]*?\b(?:error|errors?)\b\s*[:=]?\s*([0-9]+)/i;
-        my ($write_err) = $line =~ /\b(?:write|writes?)\b[^\d\n\p{P}]*?\b(?:error|errors?)\b\s*[:=]?\s*([0-9]+)/i;
-        my ($edc_err) = $line =~ /\b(?:edc|parity|dq)\b[^\d\n\p{P}]*?\b(?:error|errors?)\b\s*[:=]?\s*([0-9]+)/i;
-
-        # Patterns like: "Request = 123 , EDC Error = 45"
-        if ((!defined $edc_err || $edc_err == 0) && $line =~ /Request\s*=\s*([0-9]+)\s*,\s*EDC\s*Error\s*[:=]\s*([0-9]+)/i) {
-            $edc_err = $2;
-        }
-
-        # Another pattern: "Ch0 Reads: Request = X , EDC Error = Y"
-        if ((!defined $edc_err || $edc_err == 0) && $line =~ /EDC\s*Error\s*[:=]\s*([0-9]+)/i) {
-            $edc_err = $1 if defined $1;
-        }
-
-        # If explicit read/write error numbers are not found, try looser matches
-        if (!defined $read_err || $read_err eq '') {
-            ($read_err) = $line =~ /\breads?\b[^0-9]{0,10}([0-9]{1,9})/i;
-        }
-        if (!defined $write_err || $write_err eq '') {
-            ($write_err) = $line =~ /\bwrites?\b[^0-9]{0,10}([0-9]{1,9})/i;
-        }
+sub read_profile_value {
+    my ($key) = @_;
+    return '' unless defined $key && $key ne '';
     return '' unless -f $profile_dst;
+
     open my $fh, '<', $profile_dst or return '';
     while (my $line = <$fh>) {
         chomp $line;
-        if ($line =~ /^$key\s+(.+)$/) {
+        if ($line =~ /^\Q$key\E\s+(.+)$/) {
             close $fh;
             my $val = $1;
             $val =~ s/^\s+|\s+$//g;

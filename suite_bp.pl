@@ -1,13 +1,20 @@
 #!/usr/bin/perl
-
 use strict;
-use subs qw/quickmfg quickmfg4 qualmfg qualmfg4 extmfg config memfa memfa2 dpm ctf mfgfa init info NAVI23_MEMFA/;
 our %args;
+use subs qw/
+    quickmfg quickmfg4 qualmfg qualmfg4 extmfg config memfa memfa2 dpm ctf mfgfa
+    init info NAVI23_MEMFA navi23_stress soft_reset enable_umcch_power_gating
+    disable_umcch_power_gating enable_dyn_disconnect enable_smc_fan_control
+    disable_smc_fan_control dpm_sequence fan memfa2 init_flow deinit_flow
+    bump_clocks restore_nature_dpm set_mclk_dpm sku_detect register_param_option
+    register_param_default add_prog add_tool add_sub add_block add_func_param
+    clear_func_param set_env_opt bp_sequence bq_sequence fa2_sequence
+    thermaltune_sequence extmfg_menu printl save_cfgdata read_input
+ /;
 our $tsl_param;
 our %global;
 our $smbus_address;
 our $enable_vcn;
-our $os = TS::AppConf->get_os();
 our $dgpu_did;
 our $dgpu_rid;
 our $sku = get_dgpu_sku();
@@ -22,7 +29,7 @@ $dgpu_rid=get_dgpu_revision();
 
 register_param_option(
   boardtest => [qw/
-    quickmfg quickmfg4 qualmfg qualmfg4 extmfg memfa memfa2 dpm config ctf mfgfa info init chkfp NAVI23_MEMFA/],
+    quickmfg quickmfg4 qualmfg qualmfg4 extmfg memfa memfa2 dpm config ctf mfgfa info init chkfp NAVI23_MEMFA navi23_stress/],
 );
 
 # config: quickmfg dpm ctf pcie-linkwidth
@@ -349,6 +356,16 @@ sub NAVI23_MEMFA {
     clear_func_param;
     add_func_param("-cf=tserver-navi23.cf");
     add_block "navi23_memfa";
+    restore_nature_dpm();
+}
+
+sub navi23_stress {
+    info();
+    init_flow(1);
+    bump_clocks();
+    clear_func_param;
+    add_func_param("-cf=tserver-navi23.cf");
+    add_block "navi23_stress";
     restore_nature_dpm();
 }
 

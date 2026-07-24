@@ -69,7 +69,27 @@ run_memfa() {
     print_header
     echo "=== Ejecutando NAVI23_MEMFA ==="
     perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
+    # Forzar clocks en modo perf antes de ejecutar UMC/MEMFA
+    ./agt -i=0 -ppmode=1 >/dev/null 2>&1 || true
+    ./agt -i=0 -ppdpmforce=mclk,max >/dev/null 2>&1 || true
+    ./agt -i=0 -ppdpmforce=soc,max >/dev/null 2>&1 || true
     ./tserver -boardtest=NAVI23_MEMFA
+    local rc=$?
+    perl "$ENGINE" --parse "$rc"
+    return $rc
+}
+
+run_stress() {
+    archive_and_clean_runtime
+    sync_profile
+    print_header
+    echo "=== Stress Test Post-Reparacion (NAVI23_STRESS) ==="
+    perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
+    # Forzar clocks en modo perf antes de ejecutar stress
+    ./agt -i=0 -ppmode=1 >/dev/null 2>&1 || true
+    ./agt -i=0 -ppdpmforce=mclk,max >/dev/null 2>&1 || true
+    ./agt -i=0 -ppdpmforce=soc,max >/dev/null 2>&1 || true
+    ./tserver -boardtest=NAVI23_STRESS
     local rc=$?
     perl "$ENGINE" --parse "$rc"
     return $rc
@@ -106,6 +126,7 @@ Uso: ./RX6650XT.sh [info|training|memfa|chkfp|quick|menu]
   info      Muestra perfil activo y datos de hardware
   training  Ejecuta el chequeo de training de memoria
   memfa     Ejecuta el flujo NAVI23_MEMFA con validacion y parser
+    stress    Ejecuta el Stress Post-Reparacion (NAVI23_STRESS)
   chkfp     Ejecuta el flujo chkfp del suite_bp
   quick     Ejecuta quickmfg4 sin pasos de CTF/BAMACO
   menu      Abre un menu simple interactivo
@@ -120,6 +141,7 @@ menu() {
         echo "3) MEMFA (NAVI23)"
         echo "4) CHKFP"
         echo "5) QUICKMFG4"
+        echo "6) Stress Test Post-Reparacion (NAVI23_STRESS)"
         echo "Q) Salir"
         echo
         read -r -p "Opcion: " choice
@@ -142,6 +164,10 @@ menu() {
                 ;;
             5)
                 run_quick
+                read -r -p "Enter para continuar..." _
+                ;;
+            6)
+                run_stress
                 read -r -p "Enter para continuar..." _
                 ;;
             q|Q)
