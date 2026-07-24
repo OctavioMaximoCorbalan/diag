@@ -1,6 +1,7 @@
--d=1
+-d=gpu.1
 -pr
 -log
+-v=info
 -eofe=1
 -fskip
 -skiptextbuffering
@@ -11,4 +12,5 @@
 -monitor_perf
 -monitorperf_select=metrics
 -pm_sys_mem
--v=info
+-df_ecc_config_mode=gncm_noalloc
+-memfa_mem=1

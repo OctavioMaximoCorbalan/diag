@@ -1,6 +1,16 @@
-#BLK=NAVI23_MEMFA, PAR="-pr -log -df_ecc_config_mode=gncm_noalloc -memfa_mem=1"
+#BLK=NAVI23_MEMFA, PAR="-pr -log -df_ecc_config_mode=gncm_noalloc -memfa_mem=1 -nlog=4096"
+# Navi23 RX6650 XT 8GB / 128-bit topology: channels A0/A1/B0/B1 (UMC mask equivalent)
 UMC413.001
 UMC600.001
+
+#BLK=NAVI23_CHANNELS, PAR="-pr -log -df_ecc_config_mode=gncm_noalloc -memfa_mem=1 -short_test=0"
+UMC1.3 #NOZFB
+UMC303.7
+UMC321.025
+UMC383.016
+UMC404.014
+UMC56.155  #NOZFB
+UMC56.154  #NOZFB
 
 #BLK=Memory, PAR="-df_ecc_config_mode=gncm_noalloc "
 UMC1.3 #NOZFB
