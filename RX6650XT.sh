@@ -7,12 +7,14 @@ cd "$ROOT_DIR" || exit 1
 
 PROFILE_SOURCE="XFX6650XT_CONF_MOD.DAT"
 PROFILE_ACTIVE="FCT_CONF.DAT"
-EXPECTED_DID="73EF"
-EXPECTED_CHIP="NAVI23"
-EXPECTED_MEM="8192"
+ENGINE="rx_diag_engine.pl"
 
 sync_profile() {
     cp -f "$PROFILE_SOURCE" "$PROFILE_ACTIVE"
+}
+
+cleanup_runtime() {
+    rm -f errorid.tmp log.txt log.yml MarginResult.csv MarginResult.txt MCU.log shm_testid.log 2>/dev/null || true
 }
 
 print_header() {
@@ -20,14 +22,13 @@ print_header() {
     printf "\33[1;46m   RX6650 XT Navi23 Diagnostic Launcher   \33[0m\n"
     echo
     printf "Perfil activo: %s -> %s\n" "$PROFILE_SOURCE" "$PROFILE_ACTIVE"
-    printf "Esperado: Device ID %s, GPU %s, %s MB\n" "$EXPECTED_DID" "$EXPECTED_CHIP" "$EXPECTED_MEM"
     echo
 }
 
 show_hardware() {
     sync_profile
     print_header
-    echo "=== Perfil de fabrica activo ==="
+    echo "=== Perfil activo ==="
     cat "$PROFILE_ACTIVE"
     echo
     echo "=== ASIC / memoria ==="
@@ -47,13 +48,19 @@ run_training_check() {
 
 run_memfa() {
     sync_profile
+    cleanup_runtime
     print_header
-    echo "=== MEMFA ==="
-    ./tserver -boardtest=memfa
+    echo "=== Ejecutando NAVI23_MEMFA ==="
+    perl "$ENGINE" --validate || return 1
+    ./tserver -boardtest=NAVI23_MEMFA
+    local rc=$?
+    perl "$ENGINE" --parse "$rc"
+    return "$rc"
 }
 
 run_chkfp() {
     sync_profile
+    cleanup_runtime
     print_header
     echo "=== CHKFP ==="
     ./tserver -boardtest=chkfp -rmdriver
@@ -61,6 +68,7 @@ run_chkfp() {
 
 run_quick() {
     sync_profile
+    cleanup_runtime
     print_header
     echo "=== QUICKMFG4 ==="
     ./tserver -boardtest=quickmfg4 -nobamaco -noctf
@@ -72,7 +80,7 @@ Uso: ./RX6650XT.sh [info|training|memfa|chkfp|quick|menu]
 
   info      Muestra perfil activo y datos de hardware
   training  Ejecuta el chequeo de training de memoria
-  memfa     Ejecuta el flujo MEMFA del suite_bp
+  memfa     Ejecuta el flujo NAVI23_MEMFA con validacion y parser
   chkfp     Ejecuta el flujo chkfp del suite_bp
   quick     Ejecuta quickmfg4 sin pasos de CTF/BAMACO
   menu      Abre un menu simple interactivo
@@ -84,7 +92,7 @@ menu() {
         print_header
         echo "1) Informacion de hardware"
         echo "2) Training check de memoria"
-        echo "3) MEMFA"
+        echo "3) MEMFA (NAVI23)"
         echo "4) CHKFP"
         echo "5) QUICKMFG4"
         echo "Q) Salir"
