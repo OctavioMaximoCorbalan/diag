@@ -19,9 +19,30 @@ my $profile_dst = 'FCT_CONF.DAT';
 # ===================================================================
 # PILAR 1: RUTINAS DE VALIDACIÓN DE HARDWARE (Rescatadas de Asus)
 # ===================================================================
+        # Avoid counting generic 'Request = N' as a read error. Capture
+        # request counts separately and only treat explicit error counters
+        # as failures.
+        my ($read_err) = $line =~ /\b(?:read|reads?)\b[^\d\n\p{P}]*?\b(?:error|errors?)\b\s*[:=]?\s*([0-9]+)/i;
+        my ($write_err) = $line =~ /\b(?:write|writes?)\b[^\d\n\p{P}]*?\b(?:error|errors?)\b\s*[:=]?\s*([0-9]+)/i;
+        my ($edc_err) = $line =~ /\b(?:edc|parity|dq)\b[^\d\n\p{P}]*?\b(?:error|errors?)\b\s*[:=]?\s*([0-9]+)/i;
 
-sub read_profile_value {
-    my ($key) = @_;
+        # Patterns like: "Request = 123 , EDC Error = 45"
+        if ((!defined $edc_err || $edc_err == 0) && $line =~ /Request\s*=\s*([0-9]+)\s*,\s*EDC\s*Error\s*[:=]\s*([0-9]+)/i) {
+            $edc_err = $2;
+        }
+
+        # Another pattern: "Ch0 Reads: Request = X , EDC Error = Y"
+        if ((!defined $edc_err || $edc_err == 0) && $line =~ /EDC\s*Error\s*[:=]\s*([0-9]+)/i) {
+            $edc_err = $1 if defined $1;
+        }
+
+        # If explicit read/write error numbers are not found, try looser matches
+        if (!defined $read_err || $read_err eq '') {
+            ($read_err) = $line =~ /\breads?\b[^0-9]{0,10}([0-9]{1,9})/i;
+        }
+        if (!defined $write_err || $write_err eq '') {
+            ($write_err) = $line =~ /\bwrites?\b[^0-9]{0,10}([0-9]{1,9})/i;
+        }
     return '' unless -f $profile_dst;
     open my $fh, '<', $profile_dst or return '';
     while (my $line = <$fh>) {
@@ -80,37 +101,41 @@ sub validate_hardware {
     my $expected_link = read_profile_value('LINKWIDTH');
 
     # 1. Check DID (Extraído de P_OQC_PPID_MCU.pl)
-    my $did_detect = `./amdvbflash -ai |grep -o [0-F][0-F][0-F][0-F]1002 |cut -c 1-4`;
+    my $amd_out = `./amdvbflash -ai 2>&1`;
+    my $did_detect = '';
+    if ($amd_out =~ /DeviceID\s*[:=]?\s*0x?([0-9A-Fa-f]{4})/i) {
+        $did_detect = uc($1);
+    } elsif ($amd_out =~ /Device\s*ID\s*[:=]?\s*([0-9A-Fa-f]{4})/i) {
+        $did_detect = uc($1);
+    }
     chomp($did_detect);
-    print "BIOS_DID\t = $did_detect \n";
-    if ($did_detect ne $expected_did) {
-        print "\e[31m [FAIL] Check DID Mismatch! \e[0m\n";
+    print "BIOS_DID\t\t = $did_detect \n";
+    if ($did_detect ne uc($expected_did)) {
+        print "\e[31m [FAIL] Check DID Mismatch! (Found $did_detect, Expected $expected_did) \e[0m\n";
         $ok = 0;
     }
 
     # 2. Check MEM & Vendor (Extraído de P_OQC_PPID_MCU.pl)
-    my $memory_info = `./agt -mccfg`;
+    my $memory_info = `./agt -mccfg 2>&1`;
     my $mem_vendor = "UNKNOWN";
     my $mem_size = "UNKNOWN";
     
     my @mem_lines = split("\n", $memory_info);
     foreach my $line (@mem_lines) {
-        if($line =~ m/Memory vendor/) {
-            my @parts = split(/:/, $line); 
-            $mem_vendor = $parts[1];
+        if($line =~ m/Memory\s*vendor\s*[:=]?\s*(.+)/i) {
+            $mem_vendor = $1;
             $mem_vendor =~ s/^\s+|\s+$//g;
             print "MEM_Vendor_Type\t = $mem_vendor \n";
-            if ($mem_vendor ne $expected_vendor) {
+            if (lc($mem_vendor) ne lc($expected_vendor)) {
                 print "\e[31m [FAIL] Vendor no coincide con el perfil ($expected_vendor) \e[0m\n";
                 $ok = 0;
             }
         }
-        if($line =~ m/Calculated memory size/) {
-            my @parts = split(/:/, $line); 
-            $mem_size = $parts[1];
+        if($line =~ /Calculated\s+memory\s+size\s*[:=]?\s*([0-9]+)\s*MB/i) {
+            $mem_size = $1;
             $mem_size =~ s/^\s+|\s+$//g;
             print "MEM_CALC_size\t = $mem_size \n";
-            if ($mem_size ne $expected_mem) {
+            if ($mem_size != $expected_mem) {
                 print "\e[31m [FAIL] Tamaño VRAM Incorrecto. Esperado: $expected_mem \e[0m\n";
                 $ok = 0;
             }
@@ -118,17 +143,28 @@ sub validate_hardware {
     }
 
     # 3. Check PCIe Linkwidth (Extraído de P_OQC_PPID_MCU.pl)
-    my $link_detect = `./agt -pciestatus |grep -oi 'x[1-9]\\{1,2\\}'`;
+    my $pcie_out = `./agt -pciestatus 2>&1`;
+    my $link_detect = '';
+    if ($pcie_out =~ /x(\d{1,2})/i) {
+        $link_detect = $1;
+    }
     chomp($link_detect);
-    $link_detect =~ s/x//ig; # Limpiar la 'x'
     print "LINKWIDTH_Value\t = x$link_detect \n";
     if ($link_detect ne $expected_link) {
-        print "\e[31m [FAIL] LinkWidth no es x$expected_link \e[0m\n";
+        print "\e[31m [FAIL] LinkWidth no es x$expected_link (Found x$link_detect) \e[0m\n";
         $ok = 0;
     }
 
+    # Run fan test and persist its status to a small artifact for later parsing
     if ($ok) {
         my $fan_rc = FAN_Test();
+        my $fan_status = 'SKIP';
+        if ($fan_rc == 0) { $fan_status = 'PASS' }
+        elsif ($fan_rc != 0) { $fan_status = 'FAIL' }
+        if (open my $fhs, '>', 'fan_status.tmp') {
+            print $fhs $fan_status;
+            close $fhs;
+        }
         if ($fan_rc != 0) {
             return 1;
         }
@@ -195,6 +231,12 @@ sub channel_subpart {
     my ($channel) = @_;
     my %map = (A0 => 'Ch0', A1 => 'Ch1', B0 => 'Ch2', B1 => 'Ch3', C0 => 'Ch4', C1 => 'Ch5', D0 => 'Ch6', D1 => 'Ch7');
     return $map{$channel} || $channel;
+}
+
+sub channel_to_chip {
+    my ($channel) = @_;
+    my %chip = (A0 => 'U1', A1 => 'U2', B0 => 'U3', B1 => 'U4', C0 => 'U5', C1 => 'U6', D0 => 'U7', D1 => 'U8');
+    return $chip{$channel} || 'U?';
 }
 
 sub extract_channel_stats_from_log {
@@ -329,16 +371,14 @@ sub parse_results {
     # Leer temperaturas
     my %temps = get_temperatures();
 
-    # Estado de ventiladores
+    # Estado de ventiladores: leer el artefacto escrito por --validate
     my $fan_status = 'SKIP';
-    my $fantest = read_profile_value('FANTEST');
-    if (defined $fantest && $fantest ne '' && $fantest ne '0') {
-        my $fan_rc = system('./gpio-b-fan >/dev/null 2>&1');
-        my $fan_script_rc = 0;
-        if (-x './FANTEST_LINUX-V12') {
-            $fan_script_rc = system('./FANTEST_LINUX-V12 >/dev/null 2>&1');
-        }
-        $fan_status = ($fan_rc == 0 && $fan_script_rc == 0) ? 'PASS' : 'FAIL';
+    if (-f 'fan_status.tmp') {
+        open my $fsr, '<', 'fan_status.tmp';
+        my $cont = <$fsr> // '';
+        chomp $cont;
+        close $fsr;
+        $fan_status = $cont || 'SKIP';
     }
 
     my $log_text = read_text_file('log.txt');
@@ -351,7 +391,7 @@ sub parse_results {
     push @table_lines, "------------------------------------------------------------------------";
     push @table_lines, " EVALUACIÓN DE CANALES VRAM (Topología 128-bit):";
     push @table_lines, "------------------------------------------------------------------------";
-    push @table_lines, " CANAL / SUBPART | ESTADO | READ ERRORS | WRITE ERRORS | EDC / PARITY";
+    push @table_lines, " CANAL / SUBPART | CHIP PCB | ESTADO | READ ERRORS | WRITE ERRORS | EDC / PARITY";
     push @table_lines, "------------------------------------------------------------------------";
 
     my $channel_fail = 0;
@@ -377,8 +417,9 @@ sub parse_results {
         }
 
         push @table_lines, sprintf(
-            " Canal %-10s | %-5s | %12d | %13d | %12d",
+            " Canal %-10s | %-6s | %-5s | %12d | %13d | %12d",
             "$channel (" . channel_subpart($channel) . ")",
+            channel_to_chip($channel),
             $state,
             $read_err,
             $write_err,

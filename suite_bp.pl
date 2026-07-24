@@ -348,7 +348,7 @@ sub NAVI23_MEMFA {
     bump_clocks();
     clear_func_param;
     add_func_param("-cf=tserver-navi23.cf");
-    add_block "NAVI23_MEMFA";
+    add_block "navi23_memfa";
     restore_nature_dpm();
 }
 

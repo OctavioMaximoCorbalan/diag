@@ -17,6 +17,23 @@ cleanup_runtime() {
     rm -f errorid.tmp log.txt log.yml MarginResult.csv MarginResult.txt MCU.log shm_testid.log 2>/dev/null || true
 }
 
+archive_and_clean_runtime() {
+    ts=$(date +%Y%m%d_%H%M%S)
+    archive_dir="test_logs/archive/raw_${ts}"
+    mkdir -p "$archive_dir"
+    files=(log.txt log.yml errorid.tmp MarginResult.csv MarginResult.txt MCU.log shm_testid.log)
+    moved=0
+    for f in "${files[@]}"; do
+        if [ -e "$f" ]; then
+            mv "$f" "$archive_dir/"
+            moved=1
+        fi
+    done
+    if [ "$moved" -eq 1 ]; then
+        echo "Archived runtime files to $archive_dir"
+    fi
+}
+
 print_header() {
     clear
     printf "\33[1;46m   RX6650 XT Navi23 Diagnostic Launcher   \33[0m\n"
@@ -47,31 +64,39 @@ run_training_check() {
 }
 
 run_memfa() {
+    archive_and_clean_runtime
     sync_profile
-    cleanup_runtime
     print_header
     echo "=== Ejecutando NAVI23_MEMFA ==="
-    perl "$ENGINE" --validate || return 1
+    perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
     ./tserver -boardtest=NAVI23_MEMFA
     local rc=$?
     perl "$ENGINE" --parse "$rc"
-    return "$rc"
+    return $rc
 }
 
 run_chkfp() {
+    archive_and_clean_runtime
     sync_profile
-    cleanup_runtime
     print_header
     echo "=== CHKFP ==="
+    perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
     ./tserver -boardtest=chkfp -rmdriver
+    local rc=$?
+    perl "$ENGINE" --parse "$rc"
+    return $rc
 }
 
 run_quick() {
+    archive_and_clean_runtime
     sync_profile
-    cleanup_runtime
     print_header
     echo "=== QUICKMFG4 ==="
+    perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
     ./tserver -boardtest=quickmfg4 -nobamaco -noctf
+    local rc=$?
+    perl "$ENGINE" --parse "$rc"
+    return $rc
 }
 
 usage() {
