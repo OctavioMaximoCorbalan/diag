@@ -29,7 +29,7 @@ $dgpu_rid=get_dgpu_revision();
 
 register_param_option(
   boardtest => [qw/
-    quickmfg quickmfg4 qualmfg qualmfg4 extmfg memfa memfa2 dpm config ctf mfgfa info init chkfp NAVI23_MEMFA navi23_stress/],
+    quickmfg quickmfg4 qualmfg qualmfg4 extmfg memfa memfa2 dpm config ctf mfgfa info init chkfp NAVI23_MEMFA navi23_stress navi23_channels/],
 );
 
 # config: quickmfg dpm ctf pcie-linkwidth
@@ -366,6 +366,16 @@ sub navi23_stress {
     clear_func_param;
     add_func_param("-cf=tserver-navi23.cf");
     add_block "navi23_stress";
+    restore_nature_dpm();
+}
+
+sub navi23_channels {
+    info();
+    init_flow(1);
+    bump_clocks();
+    clear_func_param;
+    add_func_param("-cf=tserver-navi23.cf");
+    add_block "NAVI23_CHANNELS";
     restore_nature_dpm();
 }
 
