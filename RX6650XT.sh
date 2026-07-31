@@ -2,6 +2,11 @@
 
 set -u
 
+if [ "${EUID:-$(id -u)}" -ne 0 ]; then
+    echo "Este script requiere root. Ejecútalo con sudo."
+    exit 1
+fi
+
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT_DIR" || exit 1
 
@@ -21,7 +26,8 @@ archive_and_clean_runtime() {
     ts=$(date +%Y%m%d_%H%M%S)
     archive_dir="test_logs/archive/raw_${ts}"
     mkdir -p "$archive_dir"
-    files=(log.txt log.yml errorid.tmp MarginResult.csv MarginResult.txt MCU.log shm_testid.log)
+    shopt -s nullglob
+    files=(log.txt log.yml errorid.tmp MarginResult.csv MarginResult.txt MCU.log shm_testid.log fan_status.tmp *.tmp)
     moved=0
     for f in "${files[@]}"; do
         if [ -e "$f" ]; then
@@ -29,6 +35,7 @@ archive_and_clean_runtime() {
             moved=1
         fi
     done
+    shopt -u nullglob
     if [ "$moved" -eq 1 ]; then
         echo "Archived runtime files to $archive_dir"
     fi
@@ -73,7 +80,7 @@ run_memfa() {
     ./agt -i=0 -ppmode=1 >/dev/null 2>&1 || true
     ./agt -i=0 -ppdpmforce=mclk,max >/dev/null 2>&1 || true
     ./agt -i=0 -ppdpmforce=soc,max >/dev/null 2>&1 || true
-    ./tserver -boardtest=NAVI23_MEMFA
+    timeout 600s ./tserver -boardtest=NAVI23_MEMFA
     local rc=$?
     perl "$ENGINE" --parse "$rc"
     return $rc
@@ -89,7 +96,7 @@ run_stress() {
     ./agt -i=0 -ppmode=1 >/dev/null 2>&1 || true
     ./agt -i=0 -ppdpmforce=mclk,max >/dev/null 2>&1 || true
     ./agt -i=0 -ppdpmforce=soc,max >/dev/null 2>&1 || true
-    ./tserver -boardtest=NAVI23_STRESS
+    timeout 600s ./tserver -boardtest=navi23_stress
     local rc=$?
     perl "$ENGINE" --parse "$rc"
     return $rc
@@ -101,7 +108,7 @@ run_chkfp() {
     print_header
     echo "=== CHKFP ==="
     perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
-    ./tserver -boardtest=chkfp -rmdriver
+    timeout 600s ./tserver -boardtest=chkfp -rmdriver
     local rc=$?
     perl "$ENGINE" --parse "$rc"
     return $rc
@@ -113,7 +120,7 @@ run_quick() {
     print_header
     echo "=== QUICKMFG4 ==="
     perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
-    ./tserver -boardtest=quickmfg4 -nobamaco -noctf
+    timeout 600s ./tserver -boardtest=quickmfg4 -nobamaco -noctf
     local rc=$?
     perl "$ENGINE" --parse "$rc"
     return $rc
@@ -190,6 +197,9 @@ case "${1:-menu}" in
         ;;
     memfa)
         run_memfa
+        ;;
+    stress)
+        run_stress
         ;;
     chkfp)
         run_chkfp

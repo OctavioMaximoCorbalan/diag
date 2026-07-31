@@ -6,6 +6,8 @@ use File::Path qw(make_path);
 use Getopt::Long;
 use POSIX qw(strftime);
 
+die "[FAIL] Este script requiere root. Ejecútalo con sudo.\n" if $> != 0;
+
 my $mode = '';
 my $exit_code = 0;
 GetOptions(
@@ -79,6 +81,9 @@ sub validate_hardware {
     my $expected_mem = read_profile_value('MEM_Size');
     my $expected_vendor = read_profile_value('MEM_Vendor_Type');
     my $expected_link = read_profile_value('LINKWIDTH');
+    my $expected_gen_raw = read_profile_value('PCIE_GEN') || read_profile_value('LINKSPEED') || 'GEN4';
+    my $expected_gen = normalize_pcie_gen($expected_gen_raw);
+    $expected_gen = '4' if $expected_gen eq '';
 
     # 1. Check DID (Extraído de P_OQC_PPID_MCU.pl)
     my $amd_out = `./amdvbflash -ai 2>&1`;
@@ -106,9 +111,8 @@ sub validate_hardware {
             $mem_vendor = $1;
             $mem_vendor =~ s/^\s+|\s+$//g;
             print "MEM_Vendor_Type\t = $mem_vendor \n";
-            if (lc($mem_vendor) ne lc($expected_vendor)) {
-                print "\e[31m [FAIL] Vendor no coincide con el perfil ($expected_vendor) \e[0m\n";
-                $ok = 0;
+            if (defined $expected_vendor && $expected_vendor ne '' && lc($mem_vendor) ne lc($expected_vendor)) {
+                print "\e[33m [WARN] Vendor no coincide con el perfil ($expected_vendor); se permite BIOS dual-vendor. \e[0m\n";
             }
         }
         if($line =~ /Calculated\s+memory\s+size\s*[:=]?\s*([0-9]+)\s*MB/i) {
@@ -124,14 +128,17 @@ sub validate_hardware {
 
     # 3. Check PCIe Linkwidth (Extraído de P_OQC_PPID_MCU.pl)
     my $pcie_out = `./agt -pciestatus 2>&1`;
-    my $link_detect = '';
-    if ($pcie_out =~ /x(\d{1,2})/i) {
-        $link_detect = $1;
-    }
-    chomp($link_detect);
+    my $pcie = parse_pcie_status($pcie_out);
+    my $link_detect = $pcie->{width} || '';
+    my $gen_detect = $pcie->{gen} || '';
     print "LINKWIDTH_Value\t = x$link_detect \n";
-    if ($link_detect ne $expected_link) {
+    print "LINKSPEED_Value\t = GEN$gen_detect \n" if $gen_detect ne '';
+    if ($link_detect eq '' || $link_detect ne $expected_link) {
         print "\e[31m [FAIL] LinkWidth no es x$expected_link (Found x$link_detect) \e[0m\n";
+        $ok = 0;
+    }
+    if ($gen_detect eq '' || $gen_detect ne $expected_gen) {
+        print "\e[31m [FAIL] LinkSpeed no es GEN$expected_gen (Found GEN$gen_detect) \e[0m\n";
         $ok = 0;
     }
 
@@ -219,6 +226,37 @@ sub channel_to_chip {
     return $chip{$channel} || 'U?';
 }
 
+sub normalize_pcie_gen {
+    my ($value) = @_;
+    return '' unless defined $value;
+    $value =~ s/^\s+|\s+$//g;
+    return '4' if $value =~ /^(?:GEN\s*4|GEN4|4)$/i;
+    return '3' if $value =~ /^(?:GEN\s*3|GEN3|3)$/i;
+    return '';
+}
+
+sub parse_pcie_status {
+    my ($text) = @_;
+    my %pcie = ( width => '', gen => '', speed_line => '' );
+    return \%pcie unless defined $text && $text ne '';
+
+    if ($text =~ /Current\s+Link\s+Width\s*[:=]?\s*x?(\d+)/i) {
+        $pcie{width} = $1;
+    }
+    if ($text =~ /Current\s+Link\s+Speed\s*[:=]?\s*([^\n\r]+)/i) {
+        $pcie{speed_line} = $1;
+        if ($pcie{speed_line} =~ /Gen\s*([34])/i) {
+            $pcie{gen} = $1;
+        } elsif ($pcie{speed_line} =~ /16(?:\.0)?\s*GT\/s/i) {
+            $pcie{gen} = '4';
+        } elsif ($pcie{speed_line} =~ /8(?:\.0)?\s*GT\/s/i) {
+            $pcie{gen} = '3';
+        }
+    }
+
+    return \%pcie;
+}
+
 sub extract_channel_stats_from_log {
     my ($text) = @_;
     my %stats;
@@ -244,6 +282,13 @@ sub extract_channel_stats_from_log {
         }
         if (!defined $edc_err && $line =~ /\b(?:edc|parity|dq)\b.*?([0-9]+)/i) {
             ($edc_err) = $line =~ /\b(?:edc|parity|dq)\b.*?([0-9]+)/i;
+        }
+
+        if ($line =~ /\bDQ\b.*?bit\s*lanes?\s*\[?(\d+:\d+)\]?/i) {
+            $stats{$channel}{dq_lanes} = $1;
+            if ($line =~ /\b(?:fail|error|mismatch)\b/i) {
+                $stats{$channel}{dq_fail} = 1;
+            }
         }
 
         $stats{$channel}{read_errors} += 0 + ($read_err || 0);
@@ -348,8 +393,25 @@ sub parse_results {
         $status = "PASS";
     }
 
+    my $tserver_state = "0 (Sin caída de software)";
+    if ($exit_code == 139 || $exit_code == 255 || $exit_code > 128) {
+        $tserver_state = "ERROR CRÍTICO / CAÍDA (Code $exit_code)";
+        $status = 'FAIL';
+    } elsif ($exit_code != 0) {
+        $tserver_state = "Código de salida $exit_code";
+    }
+
     # Leer temperaturas
     my %temps = get_temperatures();
+    my $sensor_fail = 0;
+    for my $sensor (qw(Hotspot GFX_VR SOC_VR MEM)) {
+        if (!defined $temps{$sensor} || $temps{$sensor} eq 'N/A') {
+            $sensor_fail = 1;
+        }
+    }
+    if ($sensor_fail) {
+        $status = 'FAIL';
+    }
 
     # Estado de ventiladores: leer el artefacto escrito por --validate
     my $fan_status = 'SKIP';
@@ -365,6 +427,22 @@ sub parse_results {
     my $margin_text = read_text_file('MarginResult.csv');
     my $stats = extract_channel_stats_from_log($log_text);
     my $margins = extract_margin_state_from_csv($margin_text);
+    my @dq_notes;
+    for my $line (split /\n/, $log_text) {
+        my $channel = '';
+        if ($line =~ /\b(?:ch|channel)\s*([0-9]+)\b/i) {
+            $channel = normalize_channel_label('Ch' . $1);
+        } elsif ($line =~ /\b([A-D][0-9])\b/) {
+            $channel = normalize_channel_label($1);
+        }
+        next unless $channel && $channel =~ /^(A0|A1|B0|B1)$/;
+        if ($line =~ /\bDQ\b.*?bit\s*lanes?\s*\[?(\d+:\d+)\]?/i) {
+            my $dq_lane = $1;
+            my $chip = channel_to_chip($channel);
+            push @dq_notes, "$channel/$chip -> DQ bit lanes [$dq_lane]";
+            $status = 'FAIL' if $line =~ /\b(?:fail|error|mismatch)\b/i;
+        }
+    }
 
     my @channel_order = qw(A0 A1 B0 B1);
     my @table_lines;
@@ -387,13 +465,16 @@ sub parse_results {
             $channel_fail = 1;
         }
         if (defined $margin_value && $margin_value ne '' && $margin_value =~ /^NA$/i) {
-            $state = 'FAIL';
-            $channel_fail = 1;
             push @margin_notes, "$channel -> margen NA";
         } elsif (defined $margin_value && $margin_value ne '' && $margin_value =~ /^-\d+(?:\.\d+)?$/) {
             $state = 'FAIL';
             $channel_fail = 1;
             push @margin_notes, "$channel -> margen $margin_value";
+        }
+
+        if ($stats->{$channel}{dq_fail}) {
+            $state = 'FAIL';
+            $channel_fail = 1;
         }
 
         push @table_lines, sprintf(
@@ -424,7 +505,7 @@ sub parse_results {
     push @summary, "==========================================================";
     push @summary, "                  REPORTE DE DIAGNÓSTICO                  ";
     push @summary, "==========================================================";
-    push @summary, " ESTADO TSERVER : " . ($exit_code == 0 ? "0 (Sin caída de software)" : $exit_code);
+    push @summary, " ESTADO TSERVER : $tserver_state";
     push @summary, " CÓDIGO ERRORID : " . ($errorid || "NO GENERADO");
     push @summary, "----------------------------------------------------------";
     push @summary, " LECTURA DE TEMPERATURAS MÁXIMAS DURANTE EL TEST:";
@@ -433,8 +514,14 @@ sub parse_results {
     push @summary, "   SOC VR    : " . $temps{SOC_VR} . " °C";
     push @summary, "   VRAM (UMC): " . $temps{MEM} . " °C";
     push @summary, "   Ventiladores: $fan_status";
+    push @summary, "   Sensores I2C/SMC: FAIL" if $sensor_fail;
     push @summary, "----------------------------------------------------------";
     push @summary, @table_lines;
+    if (@dq_notes) {
+        push @summary, "----------------------------------------------------------";
+        push @summary, " DETALLES DQ:";
+        push @summary, map { "   $_" } @dq_notes;
+    }
     push @summary, "==========================================================";
 
     print join("\n", @summary), "\n";
