@@ -21,7 +21,10 @@ sync_profile() {
 archive_and_clean_runtime() {
     ts=$(date +%Y%m%d_%H%M%S)
     archive_dir="test_logs/archive/raw_${ts}"
-    mkdir -p "$archive_dir"
+    mkdir -p "$archive_dir" || {
+        echo "Error: no se pudo crear el directorio de archivado '$archive_dir'."
+        return 1
+    }
     shopt -s nullglob
     files=(log.txt log.yml errorid.tmp MarginResult.csv MarginResult.txt MCU.log shm_testid.log fan_status.tmp *.tmp)
     moved=0
@@ -40,7 +43,10 @@ archive_and_clean_runtime() {
 archive_existing_logs() {
     ts=$(date +%Y%m%d_%H%M%S)
     archive_dir="test_logs/archive/run_full_${ts}"
-    mkdir -p "$archive_dir"
+    mkdir -p "$archive_dir" || {
+        echo "Error: no se pudo crear el directorio de archivado '$archive_dir'."
+        return 1
+    }
     shopt -s nullglob
     logs=(test_logs/*.log)
     shopt -u nullglob
@@ -84,8 +90,20 @@ force_clocks_max() {
     ./agt -i=0 -ppdpmforce=soc,max >/dev/null 2>&1 || true
 }
 
+restore_clocks_safe() {
+    ./agt -i=0 -ppdpmrestore=mclk >/dev/null 2>&1 || true
+    ./agt -i=0 -ppdpmrestore=soc >/dev/null 2>&1 || true
+    ./agt -i=0 -ppmode=0 >/dev/null 2>&1 || true
+}
+
+on_exit_restore() {
+    restore_clocks_safe
+}
+
+trap on_exit_restore INT TERM EXIT
+
 run_training() {
-    archive_and_clean_runtime
+    archive_and_clean_runtime || return 1
     sync_profile
     print_header
     echo "=== Memory Training Check ==="
@@ -97,7 +115,7 @@ run_training() {
 }
 
 run_memfa() {
-    archive_and_clean_runtime
+    archive_and_clean_runtime || return 1
     sync_profile
     print_header
     echo "=== Diagnostico VRAM (NAVI23_MEMFA) ==="
@@ -110,7 +128,7 @@ run_memfa() {
 }
 
 run_channels() {
-    archive_and_clean_runtime
+    archive_and_clean_runtime || return 1
     sync_profile
     print_header
     echo "=== Aislamiento de Canales (NAVI23_CHANNELS) ==="
@@ -123,7 +141,7 @@ run_channels() {
 }
 
 run_margintest() {
-    archive_and_clean_runtime
+    archive_and_clean_runtime || return 1
     sync_profile
     print_header
     echo "=== Prueba de Margen GDDR6 (Margintest / 2dx.sh) ==="
@@ -135,7 +153,7 @@ run_margintest() {
 }
 
 run_ak404() {
-    archive_and_clean_runtime
+    archive_and_clean_runtime || return 1
     sync_profile
     print_header
     echo "=== Test de Estres Grafico (AK404.001) ==="
@@ -147,7 +165,7 @@ run_ak404() {
 }
 
 run_stress() {
-    archive_and_clean_runtime
+    archive_and_clean_runtime || return 1
     sync_profile
     print_header
     echo "=== Stress Test Post-Reparacion (NAVI23_STRESS) ==="
@@ -160,7 +178,7 @@ run_stress() {
 }
 
 run_chkfp() {
-    archive_and_clean_runtime
+    archive_and_clean_runtime || return 1
     sync_profile
     print_header
     echo "=== Check FP (CHKFP) ==="
@@ -172,7 +190,7 @@ run_chkfp() {
 }
 
 run_quick() {
-    archive_and_clean_runtime
+    archive_and_clean_runtime || return 1
     sync_profile
     print_header
     echo "=== Quick Manufacturing (QUICKMFG4) ==="
@@ -189,8 +207,8 @@ run_full() {
     local rc_chan=0
     local rc_stress=0
 
-    archive_existing_logs
-    archive_and_clean_runtime
+    archive_existing_logs || return 1
+    archive_and_clean_runtime || return 1
     sync_profile
     print_header
     echo "=== SUITE COMPLETA AUTOMATICA ==="
