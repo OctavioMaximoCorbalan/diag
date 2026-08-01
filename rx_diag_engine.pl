@@ -10,10 +10,17 @@ die "[FAIL] Este script requiere root. Ejecútalo con sudo.\n" if $> != 0;
 
 my $mode = '';
 my $exit_code = 0;
+my $master_summary = '';
 GetOptions(
     'validate' => sub { $mode = 'validate' },
     'parse=s'  => sub { $mode = 'parse'; $exit_code = shift },
+    'master-summary=s' => sub { $mode = 'master-summary'; $master_summary = shift },
 ) or die "Uso: perl rx_diag_engine.pl --validate | --parse <exit_code>\n";
+
+if ($mode eq 'master-summary' && @ARGV) {
+    $master_summary = join(',', grep { defined && $_ ne '' } ($master_summary, @ARGV));
+    @ARGV = ();
+}
 
 my $log_dir = 'test_logs';
 my $profile_dst = 'FCT_CONF.DAT';
@@ -542,6 +549,112 @@ sub parse_results {
     print "\n[LOG] Reporte guardado en $out_file\n";
 }
 
+sub collect_master_log_metrics {
+    my (@log_files) = @_;
+    my %temps = (
+        Hotspot => -1,
+        GFX_VR  => -1,
+        SOC_VR  => -1,
+        MEM     => -1,
+    );
+    my %chips;
+
+    for my $log_file (@log_files) {
+        my $text = read_text_file($log_file);
+        next unless $text ne '';
+
+        for my $line (split /\n/, $text) {
+            if ($line =~ /^\s*Hotspot\s*:\s*([0-9]+)\s*°C/i) {
+                $temps{Hotspot} = $1 if $1 > $temps{Hotspot};
+            } elsif ($line =~ /^\s*GFX\s*VR\s*:\s*([0-9]+)\s*°C/i) {
+                $temps{GFX_VR} = $1 if $1 > $temps{GFX_VR};
+            } elsif ($line =~ /^\s*SOC\s*VR\s*:\s*([0-9]+)\s*°C/i) {
+                $temps{SOC_VR} = $1 if $1 > $temps{SOC_VR};
+            } elsif ($line =~ /^\s*VRAM\s*\(UMC\)\s*:\s*([0-9]+)\s*°C/i) {
+                $temps{MEM} = $1 if $1 > $temps{MEM};
+            }
+
+            if ($line =~ /^\s*Canal\s+(.+?)\s+\|\s+(U\d+)\s+\|\s+(PASS|FAIL)\s+\|\s*([0-9]+)\s+\|\s*([0-9]+)\s+\|\s*([0-9]+)/i) {
+                my $chip = $2;
+                my $state = uc($3);
+                my ($read_err, $write_err, $edc_err) = ($4 + 0, $5 + 0, $6 + 0);
+                $chips{$chip}{read_errors} += $read_err;
+                $chips{$chip}{write_errors} += $write_err;
+                $chips{$chip}{edc_errors} += $edc_err;
+                $chips{$chip}{fail} = 1 if $state eq 'FAIL' || $read_err > 0 || $write_err > 0 || $edc_err > 0;
+            }
+        }
+    }
+
+    return (\%temps, \%chips);
+}
+
+sub generate_master_summary {
+    my ($results_string) = @_;
+    my @results = map { s/^\s+|\s+$//gr } split /,/, ($results_string || '');
+    my $master_status = 'PASS';
+    for my $result (@results) {
+        next if $result eq '';
+        if ($result ne '0') {
+            $master_status = 'FAIL';
+            last;
+        }
+    }
+
+    my @log_files = sort { (stat($b))[9] <=> (stat($a))[9] } grep { -f $_ } glob("$log_dir/*.log");
+    splice @log_files, 4 if @log_files > 4;
+
+    my ($temps, $chips) = collect_master_log_metrics(@log_files);
+    my @chips_order = qw(U1 U2 U3 U4);
+    my @chips_lines;
+    for my $chip (@chips_order) {
+        next unless exists $chips->{$chip} && $chips->{$chip}{fail};
+        push @chips_lines, sprintf(
+            "   %s -> READ=%d WRITE=%d EDC=%d",
+            $chip,
+            $chips->{$chip}{read_errors} || 0,
+            $chips->{$chip}{write_errors} || 0,
+            $chips->{$chip}{edc_errors} || 0,
+        );
+    }
+
+    my @summary;
+    push @summary, "==========================================================";
+    push @summary, "            INFORME MAESTRO CONSOLIDADO NAVI23           ";
+    push @summary, "==========================================================";
+    push @summary, " RESULTADOS ETAPAS: " . join(',', @results);
+    push @summary, " VEREDICTO MAESTRO: $master_status";
+    push @summary, "----------------------------------------------------------";
+    push @summary, " TEMPERATURA MÁXIMA ABSOLUTA:";
+    push @summary, sprintf("   Hotspot   : %s °C", $temps->{Hotspot} >= 0 ? $temps->{Hotspot} : 'N/A');
+    push @summary, sprintf("   GFX VR    : %s °C", $temps->{GFX_VR} >= 0 ? $temps->{GFX_VR} : 'N/A');
+    push @summary, sprintf("   SOC VR    : %s °C", $temps->{SOC_VR} >= 0 ? $temps->{SOC_VR} : 'N/A');
+    push @summary, sprintf("   VRAM (UMC): %s °C", $temps->{MEM} >= 0 ? $temps->{MEM} : 'N/A');
+    push @summary, "----------------------------------------------------------";
+    push @summary, " CANALES/CHIPS CON FAIL CONSOLIDADO:";
+    if (@chips_lines) {
+        push @summary, @chips_lines;
+    } else {
+        push @summary, "   Ninguno";
+    }
+    push @summary, "==========================================================";
+
+    print join("\n", @summary), "\n";
+    if ($master_status eq 'PASS') {
+        ShowPass();
+    } else {
+        ShowFail();
+    }
+
+    my $stamp = strftime('%Y%m%d_%H%M%S', localtime);
+    make_path($log_dir) unless -d $log_dir;
+    my $out_file = "$log_dir/[$master_status]_MASTER_NAVI23_${stamp}.log";
+    open my $out_fh, '>', $out_file or die "No se pudo escribir $out_file\n";
+    print {$out_fh} join("\n", @summary), "\n";
+    close $out_fh;
+    print "\n[LOG] Informe maestro guardado en $out_file\n";
+}
+
 # ===================================================================
 # EJECUCIÓN DEL MOTOR
 # ===================================================================
@@ -550,6 +663,9 @@ if ($mode eq 'validate') {
     exit validate_hardware();
 } elsif ($mode eq 'parse') {
     parse_results($exit_code);
+    exit 0;
+} elsif ($mode eq 'master-summary') {
+    generate_master_summary($master_summary);
     exit 0;
 } else {
     die "Debe especificar --validate o --parse <exit_code>\n";

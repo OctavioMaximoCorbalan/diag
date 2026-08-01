@@ -37,6 +37,25 @@ archive_and_clean_runtime() {
     fi
 }
 
+archive_existing_logs() {
+    ts=$(date +%Y%m%d_%H%M%S)
+    archive_dir="test_logs/archive/run_full_${ts}"
+    mkdir -p "$archive_dir"
+    shopt -s nullglob
+    logs=(test_logs/*.log)
+    shopt -u nullglob
+    moved=0
+    for f in "${logs[@]}"; do
+        if [ -e "$f" ]; then
+            mv "$f" "$archive_dir/"
+            moved=1
+        fi
+    done
+    if [ "$moved" -eq 1 ]; then
+        echo "Archived previous logs to $archive_dir"
+    fi
+}
+
 print_header() {
     clear
     printf "\33[1;46m   RX6650 XT Navi23 Diagnostic Launcher   \33[0m\n"
@@ -165,18 +184,50 @@ run_quick() {
 }
 
 run_full() {
+    local rc_train=0
+    local rc_memfa=0
+    local rc_chan=0
+    local rc_stress=0
+
+    archive_existing_logs
+    archive_and_clean_runtime
+    sync_profile
     print_header
     echo "=== SUITE COMPLETA AUTOMATICA ==="
     echo "Iniciando secuencia de diagnostico total..."
-    sleep 2
-    run_training
-    echo "Presiona Enter para continuar con MEMFA..." && read -r
-    run_memfa
-    echo "Presiona Enter para continuar con Analisis de Canales..." && read -r
-    run_channels
-    echo "Presiona Enter para continuar con Stress Post-Reparacion..." && read -r
-    run_stress
-    echo "=== SUITE FINALIZADA. Revisa test_logs/ para el historial. ==="
+    perl "$ENGINE" --validate || {
+        echo "[CRÍTICO] Fallo en la validación inicial de hardware. Abortando suite para proteger el equipo."
+        return 1
+    }
+
+    echo "[1/4] Training"
+    timeout 600s ./memtune trainingcheck
+    rc_train=$?
+    perl "$ENGINE" --parse "$rc_train"
+
+    echo "[2/4] MEMFA"
+    perl "$ENGINE" --validate || true
+    force_clocks_max
+    timeout 600s ./tserver -boardtest=NAVI23_MEMFA
+    rc_memfa=$?
+    perl "$ENGINE" --parse "$rc_memfa"
+
+    echo "[3/4] CHANNELS"
+    perl "$ENGINE" --validate || true
+    force_clocks_max
+    timeout 600s ./tserver -boardtest=navi23_channels
+    rc_chan=$?
+    perl "$ENGINE" --parse "$rc_chan"
+
+    echo "[4/4] STRESS"
+    perl "$ENGINE" --validate || true
+    force_clocks_max
+    timeout 600s ./tserver -boardtest=navi23_stress
+    rc_stress=$?
+    perl "$ENGINE" --parse "$rc_stress"
+
+    perl "$ENGINE" --master-summary "$rc_train" "$rc_memfa" "$rc_chan" "$rc_stress"
+    echo "=== SUITE FINALIZADA. Revisa test_logs/ y el informe maestro consolidado. ==="
 }
 
 view_logs() {
