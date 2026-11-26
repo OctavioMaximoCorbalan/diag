@@ -12,9 +12,9 @@ my $mode = '';
 my $exit_code = 0;
 my $master_summary = '';
 GetOptions(
-    'validate' => sub { $mode = 'validate' },
-    'parse=s'  => sub { $mode = 'parse'; $exit_code = shift },
-    'master-summary=s' => sub { $mode = 'master-summary'; $master_summary = shift },
+    'validate'         => sub { $mode = 'validate' },
+    'parse=i'          => sub { my ($n, $v) = @_; $mode = 'parse'; $exit_code = $v },
+    'master-summary=s' => sub { my ($n, $v) = @_; $mode = 'master-summary'; $master_summary = $v },
 ) or die "Uso: perl rx_diag_engine.pl --validate | --parse <exit_code>\n";
 
 if ($mode eq 'master-summary' && @ARGV) {
@@ -53,7 +53,7 @@ sub FAN_Test {
 
     if (!defined $fantest || $fantest eq '' || $fantest eq '0') {
         print "FAN_TEST\t = SKIP (FANTEST=0)\n";
-        return 0;
+        return 2;
     }
 
     if (-x './FANTEST_LINUX-V12') {
@@ -66,8 +66,8 @@ sub FAN_Test {
     }
 
     print "FAN_TEST\t = RUN ($fan_script)\n";
-    my $gpio_rc = system('./gpio-b-fan');
-    my $fan_rc = system($fan_script);
+    my $gpio_rc = (-x './gpio-b-fan') ? system('./gpio-b-fan') : 0;
+    my $fan_rc  = ($fan_script ne './gpio-b-fan') ? system($fan_script) : 0;
 
     if ($gpio_rc != 0 || $fan_rc != 0) {
         print "\e[31m [FAIL] FAN test falló. \e[0m\n";
@@ -95,7 +95,7 @@ sub validate_hardware {
     # 1. Check DID (Extraído de P_OQC_PPID_MCU.pl)
     my $amd_out = `./amdvbflash -ai 2>&1`;
     my $did_detect = '';
-    if ($amd_out =~ /DeviceID\s*[:=]?\s*0x?([0-9A-Fa-f]{4})/i) {
+    if ($amd_out =~ /Device\s*ID\s*[:=]?\s*(?:0x)?([0-9A-Fa-f]{4})\b/i) {
         $did_detect = uc($1);
     } elsif ($amd_out =~ /Device\s*ID\s*[:=]?\s*([0-9A-Fa-f]{4})/i) {
         $did_detect = uc($1);
@@ -114,23 +114,31 @@ sub validate_hardware {
     
     my @mem_lines = split("\n", $memory_info);
     foreach my $line (@mem_lines) {
-        if($line =~ m/Memory\s*vendor\s*[:=]?\s*(.+)/i) {
+        if ($line =~ m/Memory\s*vendor(?:\s*\/\s*type)?\s*[:=]?\s*(.+)/i) {
             $mem_vendor = $1;
             $mem_vendor =~ s/^\s+|\s+$//g;
             print "MEM_Vendor_Type\t = $mem_vendor \n";
-            if (defined $expected_vendor && $expected_vendor ne '' && lc($mem_vendor) ne lc($expected_vendor)) {
+            if (defined $expected_vendor && $expected_vendor ne '' && index(lc($mem_vendor), lc($expected_vendor)) < 0) {
                 print "\e[33m [WARN] Vendor no coincide con el perfil ($expected_vendor); se permite BIOS dual-vendor. \e[0m\n";
             }
         }
-        if($line =~ /Calculated\s+memory\s+size\s*[:=]?\s*([0-9]+)\s*MB/i) {
-            $mem_size = $1;
-            $mem_size =~ s/^\s+|\s+$//g;
-            print "MEM_CALC_size\t = $mem_size \n";
-            if ($mem_size != $expected_mem) {
-                print "\e[31m [FAIL] Tamaño VRAM Incorrecto. Esperado: $expected_mem \e[0m\n";
-                $ok = 0;
-            }
+        # Preferir "Calculated"; si agt no la imprime, usar "Current"/"detected"
+        if ($line =~ /(Calculated|Current|detected)\s+memory\s+size\s*[:=]?\s*([0-9]+)\s*MB/i) {
+            $mem_size = $2 if $mem_size eq 'UNKNOWN' || lc($1) eq 'calculated';
         }
+    }
+    if ($mem_size ne 'UNKNOWN') {
+        print "MEM_CALC_size\t = $mem_size \n";
+        # tolerancia 1%: "Current"/"detected" descuentan memoria reservada (8176/8168 vs 8192)
+        if ($expected_mem eq '' || abs($mem_size - $expected_mem) > $expected_mem * 0.01) {
+            print "\e[31m [FAIL] Tamaño VRAM Incorrecto. Esperado: $expected_mem \e[0m\n";
+            $ok = 0;
+        }
+    }
+
+    if ($mem_size eq 'UNKNOWN') {      # insertar antes de "# 3. Check PCIe Linkwidth"
+        print "\e[31m [FAIL] No se pudo leer el tamaño de VRAM (agt -mccfg). \e[0m\n";
+        $ok = 0;
     }
 
     # 3. Check PCIe Linkwidth (Extraído de P_OQC_PPID_MCU.pl)
@@ -144,24 +152,21 @@ sub validate_hardware {
         print "\e[31m [FAIL] LinkWidth no es x$expected_link (Found x$link_detect) \e[0m\n";
         $ok = 0;
     }
-    if ($gen_detect eq '' || $gen_detect ne $expected_gen) {
-        print "\e[31m [FAIL] LinkSpeed no es GEN$expected_gen (Found GEN$gen_detect) \e[0m\n";
+
+    my $min_gen = 3;    # piso duro; entre el piso y el perfil solo advierte
+    if ($gen_detect eq '' || $gen_detect < $min_gen) {
+        print "\e[31m [FAIL] LinkSpeed menor a GEN$min_gen (Found GEN$gen_detect) \e[0m\n";
         $ok = 0;
+    } elsif ($gen_detect < $expected_gen) {
+        print "\e[33m [WARN] LinkSpeed GEN$gen_detect < GEN$expected_gen del perfil (puede ser limite del host del banco). \e[0m\n";
     }
 
     # Run fan test and persist its status to a small artifact for later parsing
     if ($ok) {
         my $fan_rc = FAN_Test();
-        my $fan_status = 'SKIP';
-        if ($fan_rc == 0) { $fan_status = 'PASS' }
-        elsif ($fan_rc != 0) { $fan_status = 'FAIL' }
-        if (open my $fhs, '>', 'fan_status.tmp') {
-            print $fhs $fan_status;
-            close $fhs;
-        }
-        if ($fan_rc != 0) {
-            return 1;
-        }
+        my $fan_status = $fan_rc == 0 ? 'PASS' : $fan_rc == 2 ? 'SKIP' : 'FAIL';
+        if (open my $fhs, '>', 'fan_status.tmp') { print $fhs $fan_status; close $fhs; }
+        if ($fan_rc == 1) { return 1; }
         print "\e[32m[PASS] Validación superada. Iniciando diagnóstico...\e[0m\n";
         return 0;
     }
@@ -229,7 +234,7 @@ sub channel_subpart {
 
 sub channel_to_chip {
     my ($channel) = @_;
-    my %chip = (A0 => 'U1', A1 => 'U2', B0 => 'U3', B1 => 'U4', C0 => 'U5', C1 => 'U6', D0 => 'U7', D1 => 'U8');
+    my %chip = (A0=>'U1', A1=>'U1', B0=>'U2', B1=>'U2', C0=>'U3', C1=>'U3', D0=>'U4', D1=>'U4');
     return $chip{$channel} || 'U?';
 }
 
@@ -247,18 +252,16 @@ sub parse_pcie_status {
     my %pcie = ( width => '', gen => '', speed_line => '' );
     return \%pcie unless defined $text && $text ne '';
 
-    if ($text =~ /Current\s+Link\s+Width\s*[:=]?\s*x?(\d+)/i) {
+    if ($text =~ /Link\s+Width\s*[:=]?\s*x?(\d+)/i) {
         $pcie{width} = $1;
     }
-    if ($text =~ /Current\s+Link\s+Speed\s*[:=]?\s*([^\n\r]+)/i) {
+    if ($text =~ /Link\s+Speed\s*[:=]?\s*([^\n\r]+)/i) {
         $pcie{speed_line} = $1;
-        if ($pcie{speed_line} =~ /Gen\s*([34])/i) {
-            $pcie{gen} = $1;
-        } elsif ($pcie{speed_line} =~ /16(?:\.0)?\s*GT\/s/i) {
-            $pcie{gen} = '4';
-        } elsif ($pcie{speed_line} =~ /8(?:\.0)?\s*GT\/s/i) {
-            $pcie{gen} = '3';
-        }
+        if    ($pcie{speed_line} =~ /GEN\s*([1-4])/i)         { $pcie{gen} = $1; }
+        elsif ($pcie{speed_line} =~ /\b16(?:\.0)?\s*GT\/s/i)  { $pcie{gen} = '4'; }
+        elsif ($pcie{speed_line} =~ /\b8(?:\.0)?\s*GT\/s/i)   { $pcie{gen} = '3'; }
+        elsif ($pcie{speed_line} =~ /\b2\.5\s*GT\/s/i)        { $pcie{gen} = '1'; }
+        elsif ($pcie{speed_line} =~ /\b5(?:\.0)?\s*GT\/s/i)   { $pcie{gen} = '2'; }
     }
 
     return \%pcie;
@@ -278,18 +281,9 @@ sub extract_channel_stats_from_log {
         }
         next unless $channel;
 
-        my ($read_err) = $line =~ /\b(?:read|reads?)\s*(?:error|errors?)\s*[:=]?\s*([0-9]+)/i;
-        my ($write_err) = $line =~ /\b(?:write|writes?)\s*(?:error|errors?)\s*[:=]?\s*([0-9]+)/i;
-        my ($edc_err) = $line =~ /\b(?:edc|parity|dq)\s*(?:error|errors?)\s*[:=]?\s*([0-9]+)/i;
-        if (!defined $read_err && $line =~ /\b(?:read|reads?)\b.*?([0-9]+)\s*,\s*.*?edc/i) {
-            ($read_err) = $line =~ /\b(?:read|reads?)\b.*?([0-9]+)\s*,\s*.*?edc/i;
-        }
-        if (!defined $write_err && $line =~ /\b(?:write|writes?)\b.*?([0-9]+)\s*,\s*.*?edc/i) {
-            ($write_err) = $line =~ /\b(?:write|writes?)\b.*?([0-9]+)\s*,\s*.*?edc/i;
-        }
-        if (!defined $edc_err && $line =~ /\b(?:edc|parity|dq)\b.*?([0-9]+)/i) {
-            ($edc_err) = $line =~ /\b(?:edc|parity|dq)\b.*?([0-9]+)/i;
-        }
+        my ($read_err)  = $line =~ /\bread\s*errors?\s*[:=]?\s*([0-9]+)/i;
+        my ($write_err) = $line =~ /\bwrite\s*errors?\s*[:=]?\s*([0-9]+)/i;
+        my ($edc_err)   = $line =~ /\b(?:edc|parity|dq)\s*errors?\s*[:=]?\s*([0-9]+)/i;
 
         if ($line =~ /\bDQ\b.*?bit\s*lanes?\s*\[?(\d+:\d+)\]?/i) {
             $stats{$channel}{dq_lanes} = $1;
@@ -339,11 +333,14 @@ sub extract_margin_state_from_csv {
 
         for my $idx (0 .. $#channels) {
             my $channel = $channels[$idx];
-            next unless $channel =~ /^(A0|A1|B0|B1)$/;
-            my $value = $cells[$idx + 1] || '';
-            $value =~ s/^\s+|\s+$//g;
+            my $value = $cells[$idx + 1];
             next unless defined $value && $value ne '';
-            $margins{$channel} = $value; 
+            if ($value =~ /^-?\d+(?:\.\d+)?$/) {
+                $margins{$channel} = $value
+                    if !defined $margins{$channel} || $margins{$channel} !~ /^-?\d/ || $value < $margins{$channel};
+            } else {
+                $margins{$channel} //= $value;
+            }
         }
     }
 
@@ -388,20 +385,22 @@ sub ShowFail {
 
 sub parse_results {
     my ($exit_code) = @_;
-    my $errorid = '';
-    if (-e 'errorid.tmp') {
-        $errorid = `cat errorid.tmp`;
-        chomp($errorid);
-    }
+    my $errorid = read_text_file('errorid.tmp');
+    $errorid =~ s/\s+\z//;
 
-    # Definir el veredicto
-    my $status = "FAIL";
-    if ($exit_code == 0 && $errorid =~ /PASS/i) {
-        $status = "PASS";
+    my $status = 'FAIL';
+    if ($exit_code == 0 && $errorid =~ /\bPASS\b/i && $errorid !~ /\b(?:FAIL|ERROR)/i) {
+        $status = 'PASS';
     }
 
     my $tserver_state = "0 (Sin caída de software)";
-    if ($exit_code == 139 || $exit_code == 255 || $exit_code > 128) {
+    if ($exit_code == 124) {
+        $tserver_state = "TIMEOUT (el test excedió el límite)";
+        $status = 'FAIL';
+    } elsif ($exit_code == 130 || $exit_code == 143) {
+        $tserver_state = "ABORTADO por señal (Code $exit_code)";
+        $status = 'FAIL';
+    } elsif ($exit_code == 139 || $exit_code == 255 || $exit_code > 128) {
         $tserver_state = "ERROR CRÍTICO / CAÍDA (Code $exit_code)";
         $status = 'FAIL';
     } elsif ($exit_code != 0) {
@@ -442,7 +441,7 @@ sub parse_results {
         } elsif ($line =~ /\b([A-D][0-9])\b/) {
             $channel = normalize_channel_label($1);
         }
-        next unless $channel && $channel =~ /^(A0|A1|B0|B1)$/;
+        next unless $channel;
         if ($line =~ /\bDQ\b.*?bit\s*lanes?\s*\[?(\d+:\d+)\]?/i) {
             my $dq_lane = $1;
             my $chip = channel_to_chip($channel);
@@ -451,7 +450,7 @@ sub parse_results {
         }
     }
 
-    my @channel_order = qw(A0 A1 B0 B1);
+    my @channel_order = qw(A0 A1 B0 B1 C0 C1 D0 D1);
     my @table_lines;
     push @table_lines, "------------------------------------------------------------------------";
     push @table_lines, " EVALUACIÓN DE CANALES VRAM (Topología 128-bit):";
@@ -547,6 +546,7 @@ sub parse_results {
     print {$out_fh} join("\n", @summary), "\n";
     close $out_fh;
     print "\n[LOG] Reporte guardado en $out_file\n";
+    return ($status eq 'PASS') ? 0 : 1;
 }
 
 sub collect_master_log_metrics {
@@ -653,6 +653,7 @@ sub generate_master_summary {
     print {$out_fh} join("\n", @summary), "\n";
     close $out_fh;
     print "\n[LOG] Informe maestro guardado en $out_file\n";
+    return ($master_status eq 'PASS') ? 0 : 1;
 }
 
 # ===================================================================
@@ -662,8 +663,7 @@ sub generate_master_summary {
 if ($mode eq 'validate') {
     exit validate_hardware();
 } elsif ($mode eq 'parse') {
-    parse_results($exit_code);
-    exit 0;
+    exit parse_results($exit_code);
 } elsif ($mode eq 'master-summary') {
     generate_master_summary($master_summary);
     exit 0;

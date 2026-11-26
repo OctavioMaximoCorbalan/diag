@@ -357,6 +357,7 @@ sub NAVI23_MEMFA {
     add_func_param("-cf=tserver-navi23.cf");
     add_block "navi23_memfa";
     restore_nature_dpm();
+    deinit_flow();
 }
 
 sub navi23_stress {
@@ -367,6 +368,7 @@ sub navi23_stress {
     add_func_param("-cf=tserver-navi23.cf");
     add_block "navi23_stress";
     restore_nature_dpm();
+    deinit_flow();
 }
 
 sub navi23_channels {
@@ -377,6 +379,7 @@ sub navi23_channels {
     add_func_param("-cf=tserver-navi23.cf");
     add_block "NAVI23_CHANNELS";
     restore_nature_dpm();
+    deinit_flow();
 }
 
 sub memfa2 {
@@ -482,9 +485,9 @@ sub extmfg_hcfg {
     my $hcfg = "";
     $hcfg .= "\t".($input{err_pause}{to_exit} ? "Exit" : "Continue")." ".($input{err_pause}{pause} ? "with" : "without")." pause on error\n" if $input{err_pause};
     $hcfg .= "\tStutter Mode Tests\n" if $input{stutter};
-    $hcfg .= "\tUMC Power Gating Tests\n" if $input{stutter};
+    $hcfg .= "\tUMC Power Gating Tests\n" if $input{umcpg};
     $hcfg .= "\tDPM Tests\n" if $input{dpm};
-    $hcfg .= "\tPCIE Gen".$input{"pcie-gen"}." Tests\n" if $input{pcie};
+    $hcfg .= "\tPCIE Gen".$input{pcie_gen}." Tests\n" if $input{pcie};
     $hcfg .= "\tPCIE link width Tests\n" if $input{pcie_width_X};
     $hcfg .= "\tGeneral Tests\n" if $input{gen_mfg};
     $hcfg .= "\tGFX tests\n" if $input{gfx};

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -u
+export LC_ALL=C
 
 if [ "${EUID:-$(id -u)}" -ne 0 ]; then
     echo "Error: Este script requiere privilegios de superusuario. Ejecútalo con sudo."
@@ -15,18 +16,23 @@ PROFILE_ACTIVE="FCT_CONF.DAT"
 ENGINE="rx_diag_engine.pl"
 
 sync_profile() {
-    cp -f "$PROFILE_SOURCE" "$PROFILE_ACTIVE"
+    if [ ! -f "$PROFILE_SOURCE" ]; then
+        echo "Error: falta el perfil '$PROFILE_SOURCE'." >&2
+        return 1
+    fi
+    cp -f -- "$PROFILE_SOURCE" "$PROFILE_ACTIVE"
 }
 
 archive_and_clean_runtime() {
+    local ts archive_dir files moved f
     ts=$(date +%Y%m%d_%H%M%S)
     archive_dir="test_logs/archive/raw_${ts}"
     mkdir -p "$archive_dir" || {
         echo "Error: no se pudo crear el directorio de archivado '$archive_dir'."
         return 1
     }
-    shopt -s nullglob
-    files=(log.txt log.yml errorid.tmp MarginResult.csv MarginResult.txt MCU.log shm_testid.log fan_status.tmp *.tmp)
+    files=(log.txt log.yml errorid.tmp MarginResult.csv MarginResult.txt MCU.log shm_testid.log fan_status.tmp)
+
     moved=0
     for f in "${files[@]}"; do
         if [ -e "$f" ]; then
@@ -34,7 +40,6 @@ archive_and_clean_runtime() {
             moved=1
         fi
     done
-    shopt -u nullglob
     if [ "$moved" -eq 1 ]; then
         echo "Archived runtime files to $archive_dir"
     fi
@@ -84,171 +89,145 @@ show_hardware() {
     ./agt -biosbuildnum || true
 }
 
+CLOCKS_DIRTY=0   # 1 = la GPU pudo quedar con ppmode/DPM alterados
+TEST_TIMEOUT="${TEST_TIMEOUT:-600}"
+
 force_clocks_max() {
+    CLOCKS_DIRTY=1
     ./agt -i=0 -ppmode=1 >/dev/null 2>&1 || true
     ./agt -i=0 -ppdpmforce=mclk,max >/dev/null 2>&1 || true
-    ./agt -i=0 -ppdpmforce=soc,max >/dev/null 2>&1 || true
+    ./agt -i=0 -ppdpmforce=soc,max  >/dev/null 2>&1 || true
 }
 
+# Idempotente: errores de dominios que no estaban forzados son esperables.
 restore_clocks_safe() {
-    ./agt -i=0 -ppdpmrestore=mclk >/dev/null 2>&1 || true
-    ./agt -i=0 -ppdpmrestore=soc >/dev/null 2>&1 || true
-    ./agt -i=0 -ppmode=0 >/dev/null 2>&1 || true
+    [ -x ./agt ] || { echo "[WARN] ./agt no encontrado: NO se pudo restaurar DPM." >&2; return 1; }
+    local a
+    for a in -ppdpmrestore=mclk -ppdpmrestore=soc -ppdpmrestore=vcn \
+             -ppdpmstatus=mclk,on -ppdpmstatus=pcie,on -ppmode=0; do
+        ./agt -i=0 "$a" >/dev/null 2>&1 || true
+    done
+    CLOCKS_DIRTY=0
 }
 
 on_exit_restore() {
+    local rc=$?
+    trap '' INT TERM HUP          # no interrumpir la limpieza
+    trap - EXIT
+    if [ "$CLOCKS_DIRTY" -eq 1 ]; then
+        echo "[CLEANUP] Restaurando DPM/ppmode de la GPU..." >&2
+        restore_clocks_safe
+    fi
+    exit "$rc"
+}
+trap on_exit_restore EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+# Ejecuta un binario de test y SIEMPRE restaura DPM al terminar (ok, fallo, timeout o Ctrl+C).
+# --foreground: sin esto Ctrl+C no llega a tserver.
+run_guarded() {
+    CLOCKS_DIRTY=1
+    timeout --foreground -k 15s "${TEST_TIMEOUT}s" "$@"
+    local rc=$?
     restore_clocks_safe
+    return "$rc"
 }
 
-trap on_exit_restore INT TERM EXIT
+prepare_run() {                       # prepare_run "<titulo>"
+    archive_and_clean_runtime || return 1
+    sync_profile              || return 1
+    print_header
+    echo "=== $1 ==="
+    perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
+}
+
+finish_run() {                        # finish_run <rc_de_la_herramienta>
+    local rc=$1 prc
+    perl "$ENGINE" --parse "$rc"
+    prc=$?
+    [ "$rc" -eq 0 ] && rc=$prc        # el veredicto FAIL del parser también cuenta
+    return "$rc"
+}
 
 run_training() {
-    archive_and_clean_runtime || return 1
-    sync_profile
-    print_header
-    echo "=== Memory Training Check ==="
-    perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
-    timeout 600s ./memtune trainingcheck
-    local rc=$?
-    perl "$ENGINE" --parse "$rc"
-    return $rc
+    prepare_run "Memory Training Check" || return 1
+    run_guarded ./memtune trainingcheck
+    finish_run $?
 }
-
 run_memfa() {
-    archive_and_clean_runtime || return 1
-    sync_profile
-    print_header
-    echo "=== Diagnostico VRAM (NAVI23_MEMFA) ==="
-    perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
+    prepare_run "Diagnostico VRAM (NAVI23_MEMFA)" || return 1
     force_clocks_max
-    timeout 600s ./tserver -boardtest=NAVI23_MEMFA
-    local rc=$?
-    perl "$ENGINE" --parse "$rc"
-    return $rc
+    run_guarded ./tserver -boardtest=NAVI23_MEMFA
+    finish_run $?
 }
-
 run_channels() {
-    archive_and_clean_runtime || return 1
-    sync_profile
-    print_header
-    echo "=== Aislamiento de Canales (NAVI23_CHANNELS) ==="
-    perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
+    prepare_run "Aislamiento de Canales (NAVI23_CHANNELS)" || return 1
     force_clocks_max
-    timeout 600s ./tserver -boardtest=navi23_channels
-    local rc=$?
-    perl "$ENGINE" --parse "$rc"
-    return $rc
+    run_guarded ./tserver -boardtest=navi23_channels
+    finish_run $?
 }
-
 run_margintest() {
-    archive_and_clean_runtime || return 1
-    sync_profile
-    print_header
-    echo "=== Prueba de Margen GDDR6 (Margintest / 2dx.sh) ==="
-    perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
-    timeout 600s ./margintest.sh
-    local rc=$?
-    perl "$ENGINE" --parse "$rc"
-    return $rc
+    prepare_run "Prueba de Margen GDDR6 (Margintest / 2dx.sh)" || return 1
+    run_guarded ./margintest.sh
+    finish_run $?
 }
-
 run_ak404() {
-    archive_and_clean_runtime || return 1
-    sync_profile
-    print_header
-    echo "=== Test de Estres Grafico (AK404.001) ==="
-    perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
-    timeout 600s ./tserver -d=gpu.* -test=ak404.001
-    local rc=$?
-    perl "$ENGINE" --parse "$rc"
-    return $rc
+    prepare_run "Test de Estres Grafico (AK404.001)" || return 1
+    run_guarded ./tserver '-d=gpu.*' -test=ak404.001      # comillas: evita glob
+    finish_run $?
 }
-
 run_stress() {
-    archive_and_clean_runtime || return 1
-    sync_profile
-    print_header
-    echo "=== Stress Test Post-Reparacion (NAVI23_STRESS) ==="
-    perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
+    prepare_run "Stress Test Post-Reparacion (NAVI23_STRESS)" || return 1
     force_clocks_max
-    timeout 600s ./tserver -boardtest=navi23_stress
-    local rc=$?
-    perl "$ENGINE" --parse "$rc"
-    return $rc
+    run_guarded ./tserver -boardtest=navi23_stress
+    finish_run $?
 }
-
 run_chkfp() {
-    archive_and_clean_runtime || return 1
-    sync_profile
-    print_header
-    echo "=== Check FP (CHKFP) ==="
-    perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
-    timeout 600s ./tserver -boardtest=chkfp -rmdriver
-    local rc=$?
-    perl "$ENGINE" --parse "$rc"
-    return $rc
+    prepare_run "Check FP (CHKFP)" || return 1
+    run_guarded ./tserver -boardtest=chkfp -rmdriver
+    finish_run $?
+}
+run_quick() {
+    prepare_run "Quick Manufacturing (QUICKMFG4)" || return 1
+    run_guarded ./tserver -boardtest=quickmfg4 -nobamaco -noctf
+    finish_run $?
 }
 
-run_quick() {
-    archive_and_clean_runtime || return 1
-    sync_profile
-    print_header
-    echo "=== Quick Manufacturing (QUICKMFG4) ==="
-    perl "$ENGINE" --validate || { echo "Validation failed, aborting."; return 1; }
-    timeout 600s ./tserver -boardtest=quickmfg4 -nobamaco -noctf
-    local rc=$?
+# full_stage "<etiqueta>" <force 0|1> <cmd...>   -> rc final en STAGE_RC
+full_stage() {
+    local tag="$1" force="$2" rc prc
+    shift 2
+    echo "$tag"
+    archive_and_clean_runtime || return 1          # log.txt/errorid.tmp frescos por etapa
+    perl "$ENGINE" --validate || { echo "[CRÍTICO] Validación fallida en $tag. Abortando suite."; return 1; }
+    if [ "$force" -eq 1 ]; then force_clocks_max; fi
+    run_guarded "$@"
+    rc=$?
     perl "$ENGINE" --parse "$rc"
-    return $rc
+    prc=$?
+    [ "$rc" -eq 0 ] && rc=$prc
+    STAGE_RC=$rc
 }
 
 run_full() {
-    local rc_train=0
-    local rc_memfa=0
-    local rc_chan=0
-    local rc_stress=0
-
+    local rc_train=0 rc_memfa=0 rc_chan=0 rc_stress=0
+    STAGE_RC=0
     archive_existing_logs || return 1
-    archive_and_clean_runtime || return 1
-    sync_profile
+    sync_profile || return 1
     print_header
     echo "=== SUITE COMPLETA AUTOMATICA ==="
-    echo "Iniciando secuencia de diagnostico total..."
-    perl "$ENGINE" --validate || {
-        echo "[CRÍTICO] Fallo en la validación inicial de hardware. Abortando suite para proteger el equipo."
-        return 1
-    }
-
-    echo "[1/4] Training"
-    timeout 600s ./memtune trainingcheck
-    rc_train=$?
-    perl "$ENGINE" --parse "$rc_train"
-
-    echo "[2/4] MEMFA"
-    perl "$ENGINE" --validate || true
-    force_clocks_max
-    timeout 600s ./tserver -boardtest=NAVI23_MEMFA
-    rc_memfa=$?
-    perl "$ENGINE" --parse "$rc_memfa"
-
-    echo "[3/4] CHANNELS"
-    perl "$ENGINE" --validate || true
-    force_clocks_max
-    timeout 600s ./tserver -boardtest=navi23_channels
-    rc_chan=$?
-    perl "$ENGINE" --parse "$rc_chan"
-
-    echo "[4/4] STRESS"
-    perl "$ENGINE" --validate || true
-    force_clocks_max
-    timeout 600s ./tserver -boardtest=navi23_stress
-    rc_stress=$?
-    perl "$ENGINE" --parse "$rc_stress"
-
-    perl "$ENGINE" --master-summary "$rc_train" "$rc_memfa" "$rc_chan" "$rc_stress"
+    full_stage "[1/4] Training" 0 ./memtune trainingcheck              || return 1; rc_train=$STAGE_RC
+    full_stage "[2/4] MEMFA"    1 ./tserver -boardtest=NAVI23_MEMFA    || return 1; rc_memfa=$STAGE_RC
+    full_stage "[3/4] CHANNELS" 1 ./tserver -boardtest=navi23_channels || return 1; rc_chan=$STAGE_RC
+    full_stage "[4/4] STRESS"   1 ./tserver -boardtest=navi23_stress   || return 1; rc_stress=$STAGE_RC
+    perl "$ENGINE" --master-summary "$rc_train,$rc_memfa,$rc_chan,$rc_stress"
     echo "=== SUITE FINALIZADA. Revisa test_logs/ y el informe maestro consolidado. ==="
 }
 
 view_logs() {
+    local logs sorted_logs opt PS3
     clear
     echo "=== Ultimos Reportes en test_logs/ ==="
     shopt -s nullglob
@@ -258,11 +237,11 @@ view_logs() {
         echo "No hay reportes disponibles aun."
         return
     fi
-    IFS=$'\n' sorted_logs=($(ls -t "${logs[@]}"))
+    mapfile -t sorted_logs < <(ls -t -- "${logs[@]}")
     PS3="Selecciona un log para abrir (presiona Enter para ver lista, 0 para salir): "
     select opt in "${sorted_logs[@]}"; do
         if [ -n "$opt" ]; then
-            less "$opt"
+            less -- "$opt"
             break
         else
             break
@@ -286,6 +265,7 @@ Opciones disponibles:
   quick       Ejecuta quickmfg4 sin pasos de CTF/BAMACO
   full        Ejecuta la SUITE COMPLETA AUTOMATICA en secuencia
   logs        Abre el visor interactivo de los ultimos reportes
+  restore     Restaura DPM/ppmode de la GPU (usar tras un kill -9 / corte del host)
   menu        Abre el menu interactivo principal (opcion por defecto)
 EOF
 }
@@ -337,6 +317,7 @@ case "${1:-menu}" in
     quick) run_quick ;;
     full) run_full ;;
     logs) view_logs ;;
+    restore) restore_clocks_safe ;;
     menu) menu ;;
     -h|--help|help) usage ;;
     *) echo "Opcion desconocida: $1"; usage; exit 1 ;;

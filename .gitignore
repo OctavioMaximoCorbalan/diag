@@ -1,8 +1,25 @@
-tserverlite
+# Binarios propietarios / pesados
 agt
 agt_mcu
 memtune
+amdvbflash
+tserver
+tserverlite
+FANTEST_LINUX-V12
+db32
 atiflash
+
+# Licencias, temporales y reportes del banco
+license/
+test_logs/
+*.tmp
+*.bak
+log.txt
+log.yml
+MarginResult.*
+reporte_*.txt
+audit_bundle_*.txt
+salida_*.txt
 *.zip
 *.log
 gpu/
